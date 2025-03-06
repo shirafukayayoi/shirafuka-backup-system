@@ -52,6 +52,8 @@ private slots:
     void showBackgroundDialog();                            // 背景画像設定ダイアログを表示するスロット
     void setBackgroundImage(const QString &imagePath);      // 背景画像を設定するスロット
     void clearBackgroundImage();                            // 背景画像をクリアするスロット
+    void addBackup();                                       // 追加
+    void showDisabledBackgroundDialog();                    // 追加
 
 protected:
     void paintEvent(QPaintEvent *event) override; // 背景を描画するために必要

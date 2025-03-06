@@ -73,8 +73,8 @@ MainWindow::MainWindow(QWidget *parent)
       totalBackupsInQueue(0),
       logDialog(nullptr),
       currentViewMode(CardView),
-      isAutomaticBackup(false), // 追加
-      m_useBackgroundImage(false),
+      isAutomaticBackup(false),    // 追加
+      m_useBackgroundImage(false), // 常にfalseに固定
       m_backgroundOpacity(80)
 {
     // 設定ファイルのパスを定義
@@ -109,25 +109,35 @@ MainWindow::MainWindow(QWidget *parent)
     connect(backupEngine, &BackupEngine::backupProgress, this, &MainWindow::updateBackupProgress);
     connect(backupEngine, &BackupEngine::backupCompleted, this, &MainWindow::backupComplete);
 
-    // 背景画像の設定を読み込む
-    loadBackgroundSettings();
+    // 背景画像の設定を読み込む - コメントアウトして無効化
+    // loadBackgroundSettings();
 
-    // メニューに背景設定を追加
+    // メニューに背景設定を追加 - 背景設定メニューを無効化
     QMenu *viewMenu = menuBar()->addMenu(tr("表示"));
     QAction *backgroundAction = viewMenu->addAction(tr("背景画像設定..."));
-    connect(backgroundAction, &QAction::triggered, this, &MainWindow::showBackgroundDialog);
+    backgroundAction->setEnabled(false); // 無効化
 
-    // テスト用メニュー追加
+    // ラムダ式を使用して無効化メッセージを表示
+    connect(backgroundAction, &QAction::triggered, this, [this]()
+            { QMessageBox::information(this, tr("背景画像機能は無効化されています"),
+                                       tr("背景画像機能は現在無効化されています。\nパフォーマンスと安定性の向上のため、この機能は利用できません。")); });
+
+    // テスト用メニュー追加 - 背景画像テストも無効化
     QMenu *debugMenu = menuBar()->addMenu("デバッグ");
     QAction *testBgAction = debugMenu->addAction("背景画像テスト...");
-    connect(testBgAction, &QAction::triggered, this, &MainWindow::testBackgroundImage);
+    testBgAction->setEnabled(false); // 無効化
 
-    // 既存の背景がなければ、デフォルト背景を提供
-    if (!m_useBackgroundImage || m_backgroundImage.isNull())
-    {
-        // デフォルト背景の提供（オプション）
-        // setDefaultBackground();
-    }
+    // 同じラムダ式を使用
+    connect(testBgAction, &QAction::triggered, this, [this]()
+            { QMessageBox::information(this, tr("背景画像機能は無効化されています"),
+                                       tr("背景画像機能は現在無効化されています。\nパフォーマンスと安定性の向上のため、この機能は利用できません。")); });
+
+    // 既存の背景がなければ、デフォルト背景を提供 - コメントアウト
+    // if (!m_useBackgroundImage || m_backgroundImage.isNull())
+    // {
+    //     // デフォルト背景の提供（オプション）
+    //     // setDefaultBackground();
+    // }
 
     // カード部分を半透明にするスタイル設定
     setupTransparentStyle();
@@ -757,24 +767,24 @@ void MainWindow::paintEvent(QPaintEvent *event)
     // 既存のウィジェット描画
     QMainWindow::paintEvent(event);
 
-    // 背景画像を描画
-    if (m_useBackgroundImage && !m_backgroundImage.isNull())
-    {
-        QPainter painter(this);
+    // 背景画像を描画 - 完全に無効化
+    // if (m_useBackgroundImage && !m_backgroundImage.isNull())
+    // {
+    //     QPainter painter(this);
 
-        // 背景画像は他のウィジェットの下に描画
-        painter.setCompositionMode(QPainter::CompositionMode_DestinationOver);
+    //     // 背景画像は他のウィジェットの下に描画
+    //     painter.setCompositionMode(QPainter::CompositionMode_DestinationOver);
 
-        // 透明度を明示的に設定
-        qreal opacity = static_cast<qreal>(m_backgroundOpacity) / 100.0;
-        qDebug() << "背景画像の透明度: " << opacity << " (元の値: " << m_backgroundOpacity << ")";
+    //     // 透明度を明示的に設定
+    //     qreal opacity = static_cast<qreal>(m_backgroundOpacity) / 100.0;
+    //     qDebug() << "背景画像の透明度: " << opacity << " (元の値: " << m_backgroundOpacity << ")";
 
-        painter.setOpacity(opacity);
-        painter.setRenderHint(QPainter::SmoothPixmapTransform);
+    //     painter.setOpacity(opacity);
+    //     painter.setRenderHint(QPainter::SmoothPixmapTransform);
 
-        // ウィンドウ全体に画像を描画
-        painter.drawPixmap(rect(), m_backgroundImage, m_backgroundImage.rect());
-    }
+    //     // ウィンドウ全体に画像を描画
+    //     painter.drawPixmap(rect(), m_backgroundImage, m_backgroundImage.rect());
+    // }
 }
 
 // 背景画像設定ダイアログを表示
@@ -1137,4 +1147,32 @@ void MainWindow::setupTransparentStyle()
 
     // 全体のスタイルシートを設定
     setStyleSheet(cardStyle);
+}
+
+// MainWindow.cppでのaddBackupボタンの処理部分
+
+void MainWindow::addBackup()
+{
+    // 親ウィジェットを明示的に指定してダイアログを作成
+    BackupDialog *dialog = new BackupDialog(this);
+
+    // モーダル（モードレス）動作を明示的に設定
+    // モーダル：親ウィンドウを操作できなくなる
+    dialog->setModal(true);
+
+    // ダイアログを接続
+    connect(dialog, &BackupDialog::accepted, this, [this, dialog]()
+            {
+                // ...existing code...
+            });
+
+    // 通常のshow()の代わりにexec()を使う場合は注意
+    // exec()はモーダルダイアログを表示してユーザーの応答を待ちます
+    dialog->exec(); // または dialog->show();
+}
+
+void MainWindow::showDisabledBackgroundDialog()
+{
+    QMessageBox::information(this, tr("背景画像機能は無効化されています"),
+                             tr("背景画像機能は現在無効化されています。\nパフォーマンスと安定性の向上のため、この機能は利用できません。"));
 }

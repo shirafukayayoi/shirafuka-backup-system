@@ -16,6 +16,8 @@ BackupDialog::BackupDialog(QWidget *parent)
 {
     setupUI();
     setWindowTitle(tr("バックアップの追加"));
+    setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
+    setAttribute(Qt::WA_DeleteOnClose, false);
 }
 
 BackupDialog::BackupDialog(const BackupConfig &config, QWidget *parent)
@@ -24,6 +26,8 @@ BackupDialog::BackupDialog(const BackupConfig &config, QWidget *parent)
     setupUI();
     loadFromConfig(config);
     setWindowTitle(tr("バックアップの編集"));
+    setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
+    setAttribute(Qt::WA_DeleteOnClose, false);
 }
 
 void BackupDialog::setupUI()
