@@ -160,11 +160,11 @@ void MainWindow::setupUI()
     backupsLayout = new QGridLayout(backupsContainer);
 
     // グリッドレイアウトの調整 - ここを修正
-    backupsLayout->setSpacing(5);                  // 間隔を小さく設定
-    backupsLayout->setVerticalSpacing(5);          // 垂直方向の間隔を特に小さく
-    backupsLayout->setHorizontalSpacing(8);        // 水平方向は少し余裕を持たせる
-    backupsLayout->setContentsMargins(8, 8, 8, 8); // マージンも小さく
-    backupsLayout->setAlignment(Qt::AlignTop);     // 上揃えで配置
+    backupsLayout->setSpacing(12);                     // 間隔を広げる
+    backupsLayout->setVerticalSpacing(15);             // 垂直方向の間隔を広げる
+    backupsLayout->setHorizontalSpacing(15);           // 水平方向も広げる
+    backupsLayout->setContentsMargins(12, 12, 12, 12); // マージンを広げる
+    backupsLayout->setAlignment(Qt::AlignTop);         // 上揃えで配置
 
     backupsContainer->setLayout(backupsLayout);
 
@@ -369,14 +369,14 @@ void MainWindow::saveBackupConfigs()
 void MainWindow::addBackupCard(const BackupConfig &config)
 {
     int cardIndex = backupCards.size();
-    int row = cardIndex / 4; // 4列配置を維持
+    int row = cardIndex / 4; // 4列配置に変更
     int col = cardIndex % 4; // 列番号（0から3）
 
     BackupCard *card = new BackupCard(config, cardIndex, backupsContainer);
 
-    // カードのサイズと表示ポリシーを最適化
-    card->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    card->setFixedHeight(120); // 高さを固定
+    // カードのサイズを最適化 - より小さく
+    card->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    card->setFixedHeight(120); // 高さを小さく (150→120)
 
     // カードをグリッドに追加する際に位置調整
     backupsLayout->addWidget(card, row, col, 1, 1, Qt::AlignTop);
@@ -1030,53 +1030,111 @@ void MainWindow::setDefaultBackground()
 // カードのスタイルを半透明に設定するメソッド
 void MainWindow::setupTransparentStyle()
 {
-    // カード全体に適用するスタイル
+    // カード全体に適用するコンパクトなスタイル
     QString cardStyle = R"(
-        QGroupBox, QFrame {
-            background-color: rgba(255, 255, 255, 180);  /* 白背景、70%不透明 */
-            border-radius: 8px;
-            border: 1px solid rgba(200, 200, 200, 220);
+        /* コンパクトなカードスタイル */
+        BackupCard {
+            background-color: rgba(255, 255, 255, 250);
+            border: 1px solid rgba(150, 150, 150, 200);
+            border-radius: 6px;
+            margin: 4px;
+            padding: 6px 6px 12px 6px; /* 下部のパディングを増やす (6px→12px) */
         }
         
-        QListView, QTreeView, QTableView, QTextEdit {
-            background-color: rgba(255, 255, 255, 160);  /* 白背景、60%不透明 */
-            border: 1px solid rgba(200, 200, 200, 200);
+        /* ボタンコンテナの下部マージン */
+        BackupCard QWidget#buttonContainer {
+            margin-bottom: 8px;
         }
         
-        QPushButton {
-            background-color: rgba(240, 240, 240, 220);  /* ほぼ不透明なボタン */
-            border: 1px solid rgba(200, 200, 200, 250);
-            border-radius: 4px;
+        /* ラベルをコンパクトに */
+        BackupCard QLabel {
+            color: #101010;
+            font-weight: normal;
+            background-color: transparent;
+        }
+        
+        /* タイトルラベル - 小さめに */
+        BackupCard QLabel#titleLabel {
+            font-weight: bold;
+            font-size: 11pt;
+            color: #000000;
+            margin-bottom: 4px;
+        }
+        
+        /* パスラベル - さらに小さく */
+        BackupCard QLabel#pathLabel {
+            color: #404040;
+            font-size: 8pt;
+        }
+        
+        /* コンパクトなボタンスタイル */
+        BackupCard QPushButton {
+            background-color: #f0f0f0;
+            color: #202020;
+            border: 1px solid #c0c0c0;
+            border-radius: 3px;
             padding: 4px 8px;
+            font-weight: bold;
+            min-width: 60px;
+            min-height: 24px;
+            font-size: 9pt;
+            margin-bottom: 6px; /* ボタン下部にマージンを追加 */
         }
         
-        QPushButton:hover {
-            background-color: rgba(230, 230, 250, 240);
+        /* 実行ボタン - コンパクトだが目立つように */
+        BackupCard QPushButton#runButton {
+            background-color: #e8f4e8;
+            color: #006000;
+            border: 1px solid #80c080;
+            min-width: 70px;
+            font-size: 10pt;
         }
         
-        QLabel {
-            background-color: transparent;  /* ラベルは完全に透明 */
+        BackupCard QPushButton#runButton:hover {
+            background-color: #d0f0d0;
         }
+        
+        /* その他のウィジェット - 変更なし */
     )";
 
-    // 特定のウィジェットに対してスタイルを設定
-    // 既存のバックアップリストやカード部分を探す
-    QList<QGroupBox *> groupBoxes = findChildren<QGroupBox *>();
-    for (QGroupBox *box : groupBoxes)
+    // バックアップカードの単純化とコンパクト化
+    for (BackupCard *card : backupCards)
     {
-        box->setStyleSheet("QGroupBox { background-color: rgba(255, 255, 255, 180); }");
+        // 基本設定
+        card->setAutoFillBackground(true);
+        card->setContentsMargins(6, 6, 6, 12); // 下部の余白を増やす (6→12)
+
+        // カードの高さを少し増やして余白を確保
+        card->setFixedHeight(130); // 120→130に増加
+
+        // 既存のボタンウィジェットを取得し、マージンを追加
+        QList<QPushButton *> buttons = card->findChildren<QPushButton *>();
+        for (QPushButton *btn : buttons)
+        {
+            // ボタン下部のマージンを設定
+            QMargins margins = btn->contentsMargins();
+            margins.setBottom(margins.bottom() + 6); // 下部に6pxのマージンを追加
+            btn->setContentsMargins(margins);
+        }
+
+        // ボタンを含む親ウィジェット（通常はQFrame）を探してIDを設定
+        QList<QFrame *> frames = card->findChildren<QFrame *>();
+        for (QFrame *frame : frames)
+        {
+            if (frame->findChildren<QPushButton *>().count() > 0)
+            {
+                frame->setObjectName("buttonContainer");
+                frame->setContentsMargins(frame->contentsMargins().left(),
+                                          frame->contentsMargins().top(),
+                                          frame->contentsMargins().right(),
+                                          frame->contentsMargins().bottom() + 8);
+            }
+        }
+
+        // その他の既存のスタイル設定（省略しています）
+        // ...existing code...
     }
 
-    QList<QFrame *> frames = findChildren<QFrame *>();
-    for (QFrame *frame : frames)
-    {
-        // フレームの背景を半透明に
-        frame->setAutoFillBackground(true);
-        QPalette pal = frame->palette();
-        pal.setColor(QPalette::Window, QColor(255, 255, 255, 180)); // 70%不透明の白
-        frame->setPalette(pal);
-    }
-
-    // 全体のスタイルシートも設定
+    // 全体のスタイルシートを設定
     setStyleSheet(cardStyle);
 }
