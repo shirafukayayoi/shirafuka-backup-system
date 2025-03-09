@@ -32,6 +32,9 @@ void BackupEngine::startBackup(const QString &sourcePath, const QString &destina
     m_currentTask = new BackupTask(sourcePath, destinationPath, this);
     connect(m_currentTask, &BackupTask::progressUpdated, this, &BackupEngine::onBackupProgressUpdated);
     connect(m_currentTask, &BackupTask::finished, this, &BackupEngine::onBackupFinished);
+    connect(m_currentTask, &BackupTask::fileProcessed, this, &BackupEngine::onFileProcessed);
+    connect(m_currentTask, &BackupTask::directoryProcessed, this, &BackupEngine::onDirectoryProcessed);
+    connect(m_currentTask, &BackupTask::operationLog, this, &BackupEngine::onOperationLog);
 
     m_currentTask->start();
 }
@@ -223,4 +226,22 @@ QFileInfoList BackupEngine::getFileList(const QDir &sourceDir,
     }
 
     return result;
+}
+
+void BackupEngine::onFileProcessed(const QString &filePath, bool success)
+{
+    // シグナルを転送
+    emit fileProcessed(filePath, success);
+}
+
+void BackupEngine::onDirectoryProcessed(const QString &dirPath, bool created)
+{
+    // シグナルを転送
+    emit directoryProcessed(dirPath, created);
+}
+
+void BackupEngine::onOperationLog(const QString &message)
+{
+    // シグナルを転送
+    emit backupLogMessage(message);
 }

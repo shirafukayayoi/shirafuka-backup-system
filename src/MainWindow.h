@@ -52,6 +52,11 @@ private slots:
     // 背景画像関連のスロットを削除
     void addBackup();
 
+    // 新しいスロット - ファイル単位のバックアップ状況をログに記録
+    void onFileProcessed(const QString &filePath, bool success);
+    void onDirectoryProcessed(const QString &dirPath, bool created);
+    void onBackupLogMessage(const QString &message);
+
 protected:
     // paintEvent を削除（背景描画に使用していたため）
 

@@ -75,7 +75,7 @@ void BackupTask::start()
     }
 }
 
-// ディレクトリの中身をコピーする（入れ子のコンテンツをコピーするが、トップレベルフォルダ自体は作らない）
+// ディレクトリの中身をコピーするメソッドを改修
 bool BackupTask::copyDirectoryContents(const QDir &sourceDir, const QDir &destDir, int &processedItems, int totalItems)
 {
     bool success = true;
@@ -105,7 +105,16 @@ bool BackupTask::copyDirectoryContents(const QDir &sourceDir, const QDir &destDi
                 {
                     qDebug() << "Failed to create directory:" << destItemPath;
                     success = false;
+                    // ディレクトリ作成失敗のログとシグナル
+                    emit directoryProcessed(destItemPath, false);
+                    emit operationLog(tr("フォルダ作成失敗: %1").arg(destItemPath));
                     continue;
+                }
+                else
+                {
+                    // ディレクトリ作成成功のログとシグナル
+                    emit directoryProcessed(destItemPath, true);
+                    emit operationLog(tr("フォルダ作成: %1").arg(destItemPath));
                 }
             }
 
@@ -132,6 +141,15 @@ bool BackupTask::copyDirectoryContents(const QDir &sourceDir, const QDir &destDi
             {
                 qDebug() << "Failed to copy file:" << srcFile.errorString();
                 success = false;
+                // ファイルコピー失敗のログとシグナル
+                emit fileProcessed(srcItemPath, false);
+                emit operationLog(tr("ファイルコピー失敗: %1 → %2 (%3)").arg(srcItemPath, destItemPath, srcFile.errorString()));
+            }
+            else
+            {
+                // ファイルコピー成功のログとシグナル
+                emit fileProcessed(srcItemPath, true);
+                emit operationLog(tr("ファイルコピー: %1").arg(info.fileName()));
             }
 
             // 進捗を更新

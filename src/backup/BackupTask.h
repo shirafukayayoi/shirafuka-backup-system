@@ -21,6 +21,11 @@ signals:
     void progressUpdated(int progress);
     void finished();
 
+    // 新しいシグナル - ファイル単位の処理状況を通知
+    void fileProcessed(const QString &filePath, bool success);
+    void directoryProcessed(const QString &dirPath, bool created);
+    void operationLog(const QString &message);
+
 private:
     bool copyDirectory(const QDir &sourceDir, const QDir &destDir, int &processedItems, int totalItems);
     bool copyDirectoryContents(const QDir &sourceDir, const QDir &destDir, int &processedItems, int totalItems);

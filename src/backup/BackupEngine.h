@@ -28,9 +28,19 @@ signals:
     void backupComplete();
     void backupError(const QString &message);
 
+    // 新しいシグナル - ファイル単位の処理状況とログメッセージ
+    void fileProcessed(const QString &filePath, bool success);
+    void directoryProcessed(const QString &dirPath, bool created);
+    void backupLogMessage(const QString &message);
+
 private slots:
     void onBackupProgressUpdated(int progress);
     void onBackupFinished();
+
+    // 新しいスロット
+    void onFileProcessed(const QString &filePath, bool success);
+    void onDirectoryProcessed(const QString &dirPath, bool created);
+    void onOperationLog(const QString &message);
 
 private:
     BackupTask *m_currentTask;

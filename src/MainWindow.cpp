@@ -65,6 +65,11 @@ MainWindow::MainWindow(QWidget *parent)
     // シグナル/スロット接続
     connect(backupEngine, &BackupEngine::backupProgress, this, &MainWindow::updateBackupProgress);
     connect(backupEngine, &BackupEngine::backupCompleted, this, &MainWindow::backupComplete);
+
+    // 新しいシグナル接続 - ファイル単位のログ記録用
+    connect(backupEngine, &BackupEngine::fileProcessed, this, &MainWindow::onFileProcessed);
+    connect(backupEngine, &BackupEngine::directoryProcessed, this, &MainWindow::onDirectoryProcessed);
+    connect(backupEngine, &BackupEngine::backupLogMessage, this, &MainWindow::onBackupLogMessage);
 }
 
 MainWindow::~MainWindow()
@@ -760,4 +765,41 @@ void MainWindow::addBackup()
     // 通常のshow()の代わりにexec()を使う場合は注意
     // exec()はモーダルダイアログを表示してユーザーの応答を待ちます
     dialog->exec(); // または dialog->show();
+}
+
+// 新しいスロット実装
+void MainWindow::onFileProcessed(const QString &filePath, bool success)
+{
+    // ファイルのバックアップ状況をログに記録
+    if (success)
+    {
+        QFileInfo fileInfo(filePath);
+        addLogEntry(tr("ファイルをバックアップしました: %1").arg(fileInfo.fileName()));
+    }
+    else
+    {
+        QFileInfo fileInfo(filePath);
+        addLogEntry(tr("ファイルのバックアップに失敗しました: %1").arg(fileInfo.fileName()));
+    }
+}
+
+void MainWindow::onDirectoryProcessed(const QString &dirPath, bool created)
+{
+    // ディレクトリ作成状況をログに記録
+    if (created)
+    {
+        QFileInfo dirInfo(dirPath);
+        addLogEntry(tr("フォルダを作成しました: %1").arg(dirInfo.fileName()));
+    }
+    else
+    {
+        QFileInfo dirInfo(dirPath);
+        addLogEntry(tr("フォルダの作成に失敗しました: %1").arg(dirInfo.fileName()));
+    }
+}
+
+void MainWindow::onBackupLogMessage(const QString &message)
+{
+    // バックアップ処理からのログメッセージを記録
+    addLogEntry(message);
 }
