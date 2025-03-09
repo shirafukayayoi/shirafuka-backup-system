@@ -15,7 +15,7 @@ public:
     ConfigManager(const QString &filePath, QObject *parent = nullptr);
 
     void loadConfig();
-    void saveConfig();
+    bool saveConfig(); // Changed return type to bool to report success/failure
 
     QList<BackupConfig> backupConfigs() const;
     void setBackupConfigs(const QList<BackupConfig> &configs);

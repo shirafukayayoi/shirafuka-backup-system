@@ -5,7 +5,10 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QDateTime>
-#include <QRegularExpression> // QRegExp から QRegularExpression に変更
+#include <QRegularExpression>    // QRegExp から QRegularExpression に変更
+#include <QJsonArray>            // 追加: QJsonArrayのヘッダー
+#include "../utils/FileSystem.h" // FileSystemを追加
+#include <QApplication>          // 追加: QApplicationのヘッダー
 
 BackupEngine::BackupEngine(QObject *parent)
     : QObject(parent), m_currentTask(nullptr)
@@ -66,8 +69,12 @@ void BackupEngine::onBackupFinished()
         m_currentTask = nullptr;
     }
 
+    // 完了メッセージをログに記録
+    emit backupLogMessage(tr("バックアップ処理が正常に完了しました"));
+
+    // 完了シグナルを発行
     emit backupCompleted();
-    emit backupComplete(); // 追加: どちらのシグナルも発火させる
+    emit backupComplete(); // 両方のシグナルを発行
 }
 
 void BackupEngine::runBackup(const BackupConfig &config)
@@ -98,6 +105,93 @@ void BackupEngine::runBackup(const BackupConfig &config)
         }
     }
 
+    // バックアップモードを確認
+    bool isGameSaveBackup = false;
+    QStringList saveDataFolders;
+
+    if (config.extraData().contains("backupMode"))
+    {
+        int mode = config.extraData()["backupMode"].toInt();
+        isGameSaveBackup = (mode == 1); // GameSaveBackupは値1
+
+        if (isGameSaveBackup && config.extraData().contains("saveDataFolders"))
+        {
+            QJsonArray foldersArray = config.extraData()["saveDataFolders"].toArray();
+            for (const QJsonValue &value : foldersArray)
+            {
+                saveDataFolders.append(value.toString());
+            }
+        }
+    }
+
+    // セーブデータバックアップモードの場合
+    if (isGameSaveBackup && !saveDataFolders.isEmpty())
+    {
+        emit backupProgress(10);
+        emit backupLogMessage(tr("セーブデータバックアップモードを使用します"));
+        emit backupLogMessage(tr("検索対象フォルダ: %1").arg(saveDataFolders.join(", ")));
+        emit backupLogMessage(tr("セーブデータフォルダの検索を開始します..."));
+
+        // UI応答性のために処理
+        QApplication::processEvents();
+
+        // セーブデータフォルダを検索 - 最大深度10で検索
+        QStringList foundFolders = FileSystem::findSpecificFolders(sourcePath, saveDataFolders, 10);
+
+        // 検索完了後にも応答性を維持
+        QApplication::processEvents();
+
+        if (foundFolders.isEmpty())
+        {
+            emit backupLogMessage(tr("セーブデータフォルダが見つかりませんでした"));
+            emit backupLogMessage(tr("バックアップ元: %1").arg(sourcePath));
+            emit backupLogMessage(tr("バックアップを中断します"));
+            emit backupProgress(100);
+            emit backupComplete();
+            return;
+        }
+
+        // 見つかったフォルダの一覧をログに表示
+        emit backupLogMessage(tr("セーブデータフォルダを %1 個見つけました:").arg(foundFolders.size()));
+        for (const QString &folder : foundFolders)
+        {
+            emit backupLogMessage(tr("  - %1").arg(folder));
+        }
+
+        emit backupProgress(30);
+        emit backupLogMessage(tr("セーブデータのコピーを開始します..."));
+
+        // UI応答性を維持
+        QApplication::processEvents();
+
+        // セーブデータフォルダをコピー
+        bool success = FileSystem::copyGameSaveData(foundFolders, destPath, [this](const QString &message)
+                                                    {
+                                                        // コールバックでログメッセージを受け取る
+                                                        emit backupLogMessage(message);
+                                                        QApplication::processEvents(); // UIの応答性を維持
+                                                    });
+
+        // コピー完了後にも応答性を維持
+        QApplication::processEvents();
+
+        if (success)
+        {
+            emit backupLogMessage(tr("すべてのセーブデータのバックアップが完了しました"));
+            emit backupLogMessage(tr("バックアップ先: %1").arg(destPath));
+        }
+        else
+        {
+            emit backupLogMessage(tr("一部のセーブデータのバックアップに失敗しました"));
+            emit backupLogMessage(tr("詳細はログを確認してください"));
+        }
+
+        emit backupProgress(100);
+        emit backupComplete();
+        return;
+    }
+
+    // 通常バックアップの場合は既存のコード
     // 除外パターンを準備
     QStringList excludedFiles = config.excludedFiles();
     QStringList excludedFolders = config.excludedFolders();
@@ -150,8 +244,11 @@ void BackupEngine::runBackup(const BackupConfig &config)
         emit backupProgress(progress);
     }
 
+    // バックアップ処理が完了したら、明示的に進捗100%を設定してから完了シグナルを発行
     emit backupProgress(100);
+    emit backupLogMessage(tr("バックアップ処理が完了しました"));
     emit backupComplete();
+    emit backupCompleted(); // 両方のシグナルを発行（互換性のため）
 }
 
 QFileInfoList BackupEngine::getFileList(const QDir &sourceDir,

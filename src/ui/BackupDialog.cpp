@@ -10,13 +10,16 @@
 #include <QTimer>
 #include <QApplication> // 追加: QApplication用
 #include <QCloseEvent>  // 追加: QCloseEvent用（念のため）
+#include <QJsonArray>   // 追加: QJsonArrayのヘッダー
 
 BackupDialog::BackupDialog(QWidget *parent)
-    : QDialog(parent)
+    : QDialog(parent),
+      m_backupMode(StandardBackup)
 {
     setupUI();
     setWindowTitle(tr("バックアップの追加"));
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
+    m_saveDataFolderNames = QStringList() << "savedata" << "UserData" << "save" << "Save";
 }
 
 BackupDialog::BackupDialog(const BackupConfig &config, QWidget *parent)
@@ -107,6 +110,54 @@ void BackupDialog::setupUI()
     // 除外タブを追加
     tabWidget->addTab(exclusionTab, tr("除外設定"));
 
+    // バックアップモード選択タブの追加
+    QWidget *modeTab = new QWidget(tabWidget);
+    QVBoxLayout *modeLayout = new QVBoxLayout(modeTab);
+
+    // モード選択ラジオボタン
+    QGroupBox *modeGroup = new QGroupBox(tr("バックアップモード"), modeTab);
+    QVBoxLayout *radioLayout = new QVBoxLayout(modeGroup);
+
+    standardBackupRadio = new QRadioButton(tr("通常バックアップ - フォルダ全体をコピー"), modeGroup);
+    saveDataBackupRadio = new QRadioButton(tr("セーブデータバックアップ - ゲームのセーブデータのみコピー"), modeGroup);
+    standardBackupRadio->setChecked(true);
+
+    radioLayout->addWidget(standardBackupRadio);
+    radioLayout->addWidget(saveDataBackupRadio);
+    modeLayout->addWidget(modeGroup);
+
+    // セーブデータフォルダの設定
+    QGroupBox *saveDataGroup = new QGroupBox(tr("セーブデータフォルダ名"), modeTab);
+    QVBoxLayout *saveDataLayout = new QVBoxLayout(saveDataGroup);
+
+    QLabel *saveDataLabel = new QLabel(tr("検索するフォルダ名を改行で区切って入力してください:"), saveDataGroup);
+    saveDataFoldersEdit = new QPlainTextEdit(saveDataGroup);
+    saveDataFoldersEdit->setPlaceholderText(tr("例:\nsavedata\nUserData\nsave\nSave"));
+    saveDataFoldersEdit->setPlainText(m_saveDataFolderNames.join("\n"));
+
+    saveDataLayout->addWidget(saveDataLabel);
+    saveDataLayout->addWidget(saveDataFoldersEdit);
+
+    modeLayout->addWidget(saveDataGroup);
+
+    // タブに追加
+    tabWidget->addTab(modeTab, tr("バックアップモード"));
+
+    // セーブデータモード選択時の動作
+    connect(standardBackupRadio, &QRadioButton::toggled, [this](bool checked)
+            {
+        if (checked) {
+            m_backupMode = StandardBackup;
+            saveDataFoldersEdit->setEnabled(false);
+        } });
+
+    connect(saveDataBackupRadio, &QRadioButton::toggled, [this](bool checked)
+            {
+        if (checked) {
+            m_backupMode = GameSaveBackup;
+            saveDataFoldersEdit->setEnabled(true);
+        } });
+
     // メインレイアウトにタブを追加
     mainLayout->addWidget(tabWidget);
 
@@ -143,43 +194,115 @@ void BackupDialog::loadFromConfig(const BackupConfig &config)
     excludedFilesEdit->setPlainText(config.excludedFiles().join("\n"));
     excludedFoldersEdit->setPlainText(config.excludedFolders().join("\n"));
     excludedExtensionsEdit->setPlainText(config.excludedExtensions().join("\n"));
+
+    // バックアップモードの設定
+    if (config.extraData().contains("backupMode"))
+    {
+        int mode = config.extraData().value("backupMode").toInt();
+        setBackupMode(static_cast<BackupMode>(mode));
+    }
+
+    if (config.extraData().contains("saveDataFolders"))
+    {
+        QStringList folders;
+        QJsonArray folderArray = config.extraData().value("saveDataFolders").toArray();
+        for (const QJsonValue &value : folderArray)
+        {
+            folders.append(value.toString());
+        }
+        m_saveDataFolderNames = folders;
+        saveDataFoldersEdit->setPlainText(folders.join("\n"));
+    }
 }
 
 BackupConfig BackupDialog::getBackupConfig() const
 {
-    BackupConfig config;
-    config.setName(nameEdit->text().trimmed());
-    config.setSourcePath(sourcePathEdit->text().trimmed());
-    config.setDestinationPath(destPathEdit->text().trimmed());
-
-    // テキストエディットから除外リストを取得して設定
-    QStringList excludedFiles = excludedFilesEdit->toPlainText().split("\n", Qt::SkipEmptyParts);
-    for (int i = 0; i < excludedFiles.size(); ++i)
+    try
     {
-        excludedFiles[i] = excludedFiles[i].trimmed();
-    }
-    config.setExcludedFiles(excludedFiles);
+        qDebug() << "BackupDialog::getBackupConfig called";
 
-    QStringList excludedFolders = excludedFoldersEdit->toPlainText().split("\n", Qt::SkipEmptyParts);
-    for (int i = 0; i < excludedFolders.size(); ++i)
-    {
-        excludedFolders[i] = excludedFolders[i].trimmed();
-    }
-    config.setExcludedFolders(excludedFolders);
+        BackupConfig config;
+        config.setName(nameEdit->text().trimmed());
+        config.setSourcePath(sourcePathEdit->text().trimmed());
+        config.setDestinationPath(destPathEdit->text().trimmed());
 
-    QStringList excludedExtensions = excludedExtensionsEdit->toPlainText().split("\n", Qt::SkipEmptyParts);
-    for (int i = 0; i < excludedExtensions.size(); ++i)
-    {
-        excludedExtensions[i] = excludedExtensions[i].trimmed();
-        // 拡張子が.で始まっていなければ先頭に.を追加
-        if (!excludedExtensions[i].startsWith('.'))
+        // テキストエディットから除外リストを取得して設定
+        QStringList excludedFiles = excludedFilesEdit->toPlainText().split("\n", Qt::SkipEmptyParts);
+        for (int i = 0; i < excludedFiles.size(); ++i)
         {
-            excludedExtensions[i] = "." + excludedExtensions[i];
+            excludedFiles[i] = excludedFiles[i].trimmed();
         }
-    }
-    config.setExcludedExtensions(excludedExtensions);
+        config.setExcludedFiles(excludedFiles);
 
-    return config;
+        QStringList excludedFolders = excludedFoldersEdit->toPlainText().split("\n", Qt::SkipEmptyParts);
+        for (int i = 0; i < excludedFolders.size(); ++i)
+        {
+            excludedFolders[i] = excludedFolders[i].trimmed();
+        }
+        config.setExcludedFolders(excludedFolders);
+
+        QStringList excludedExtensions = excludedExtensionsEdit->toPlainText().split("\n", Qt::SkipEmptyParts);
+        for (int i = 0; i < excludedExtensions.size(); ++i)
+        {
+            excludedExtensions[i] = excludedExtensions[i].trimmed();
+            // 拡張子が.で始まっていなければ先頭に.を追加
+            if (!excludedExtensions[i].startsWith('.'))
+            {
+                excludedExtensions[i] = "." + excludedExtensions[i];
+            }
+        }
+        config.setExcludedExtensions(excludedExtensions);
+
+        // バックアップモードと設定を保存
+        QJsonObject extraData = config.extraData();
+        extraData["backupMode"] = static_cast<int>(m_backupMode);
+
+        // セーブデータフォルダ名を保存
+        QStringList folders = saveDataFoldersEdit->toPlainText().split("\n", Qt::SkipEmptyParts);
+        QJsonArray folderArray;
+        for (const QString &folder : folders)
+        {
+            folderArray.append(folder.trimmed());
+        }
+        extraData["saveDataFolders"] = folderArray;
+
+        config.setExtraData(extraData);
+
+        qDebug() << "BackupConfig created successfully: " << config.name();
+        return config;
+    }
+    catch (const std::exception &e)
+    {
+        qDebug() << "Exception in getBackupConfig: " << e.what();
+        QMessageBox::critical(nullptr, tr("エラー"),
+                              tr("設定の取得中にエラーが発生しました: %1").arg(e.what()));
+        throw; // 再スロー
+    }
+    catch (...)
+    {
+        qDebug() << "Unknown exception in getBackupConfig";
+        QMessageBox::critical(nullptr, tr("エラー"),
+                              tr("設定の取得中に不明なエラーが発生しました"));
+        throw; // 再スロー
+    }
+}
+
+BackupDialog::BackupMode BackupDialog::backupMode() const
+{
+    return m_backupMode;
+}
+
+void BackupDialog::setBackupMode(BackupMode mode)
+{
+    m_backupMode = mode;
+    standardBackupRadio->setChecked(mode == StandardBackup);
+    saveDataBackupRadio->setChecked(mode == GameSaveBackup);
+    saveDataFoldersEdit->setEnabled(mode == GameSaveBackup);
+}
+
+QStringList BackupDialog::saveDataFolderNames() const
+{
+    return saveDataFoldersEdit->toPlainText().split("\n", Qt::SkipEmptyParts);
 }
 
 void BackupDialog::browseSourcePath()
@@ -294,117 +417,54 @@ void BackupDialog::updateTitleFromSourcePath()
     }
 }
 
-// accept()メソッドのオーバーライド
+// accept()メソッドの強化
 void BackupDialog::accept()
 {
-    // 入力検証など、必要な処理を行った後にダイアログを受け入れる
-    QDialog::accept();
+    qDebug() << "BackupDialog::accept() called";
+
+    // 入力検証を確実に実行
+    validateInput();
+
+    // 必須項目が入力されているか確認
+    if (!nameEdit->text().trimmed().isEmpty() &&
+        !sourcePathEdit->text().trimmed().isEmpty() &&
+        !destPathEdit->text().trimmed().isEmpty())
+    {
+        qDebug() << "BackupDialog accepting with valid input";
+
+        // 基底クラスのaccept()を呼び出してダイアログを受け入れる
+        QDialog::accept();
+        qDebug() << "BackupDialog::accept() completed successfully";
+    }
+    else
+    {
+        qDebug() << "BackupDialog validation failed";
+
+        // エラーメッセージを表示
+        QMessageBox::warning(this, tr("入力エラー"),
+                             tr("バックアップ名、元パス、先パスは必須です。"));
+    }
 }
 
-// reject()メソッド - 単純化と明示的なスコープ制限
+// reject()メソッドも同様に修正
 void BackupDialog::reject()
 {
-    qDebug() << "BackupDialog::reject() called"; // デバッグログを追加
-
-    // バックアップ実行中なら確認
-    if (startButton && !startButton->isEnabled())
-    {
-        QMessageBox::StandardButton reply = QMessageBox::question(
-            this,
-            tr("確認"),
-            tr("バックアップが進行中です。キャンセルしますか？"),
-            QMessageBox::Yes | QMessageBox::No);
-
-        if (reply == QMessageBox::Yes)
-        {
-            // バックアップをキャンセル
-            emit backupCancelled();
-
-            // UIの状態を更新
-            if (startButton)
-            {
-                startButton->setText(tr("バックアップを開始"));
-                startButton->setEnabled(true);
-            }
-            if (cancelButton)
-            {
-                cancelButton->setEnabled(false);
-            }
-
-            // 親クラスのrejectを呼び出してダイアログを閉じる
-            QDialog::reject();
-        }
-        // Noの場合は何もしない（ダイアログを開いたままにする）
-    }
-    else
-    {
-        // バックアップ実行中でなければ普通にダイアログを閉じる
-        QDialog::reject();
-    }
-
-    qDebug() << "BackupDialog::reject() finished"; // デバッグログを追加
+    // 基底クラスのrejectを直接呼び出す (QDialogのデフォルト実装)
+    QDialog::reject();
 }
 
-// closeEventを修正
+// closeEventを完全に書き直し - さらに安全な実装に
 void BackupDialog::closeEvent(QCloseEvent *event)
 {
-    qDebug() << "BackupDialog::closeEvent() called"; // デバッグログを追加
-
-    // バックアップ実行中なら確認
-    if (startButton && !startButton->isEnabled())
-    {
-        QMessageBox::StandardButton reply = QMessageBox::question(
-            this,
-            tr("確認"),
-            tr("バックアップが進行中です。キャンセルしますか？"),
-            QMessageBox::Yes | QMessageBox::No);
-
-        if (reply == QMessageBox::Yes)
-        {
-            // バックアップをキャンセル
-            emit backupCancelled();
-
-            // UIの状態を更新
-            if (startButton)
-            {
-                startButton->setText(tr("バックアップを開始"));
-                startButton->setEnabled(true);
-            }
-            if (cancelButton)
-            {
-                cancelButton->setEnabled(false);
-            }
-
-            // イベントを受け入れる（ダイアログを閉じる）
-            event->accept();
-        }
-        else
-        {
-            // キャンセルしない場合はダイアログを開いたままにする
-            event->ignore();
-        }
-    }
-    else
-    {
-        // バックアップ実行中でなければイベントを受け入れる（ダイアログを閉じる）
-        event->accept();
-    }
-
-    qDebug() << "BackupDialog::closeEvent() finished with accept:"
-             << (event->isAccepted() ? "true" : "false"); // デバッグログを追加
+    // 単純に閉じるイベントを受け入れる
+    event->accept();
 }
 
 // done()メソッドを安全に実装
 void BackupDialog::done(int result)
 {
-    qDebug() << "BackupDialog::done() called with result:" << result;
-
-    // 処理が必要なら行う（ここでは特に何もしない）
-
-    // 基底クラスの処理を呼び出す
+    // 基底クラスのdoneを直接呼び出す
     QDialog::done(result);
-
-    qDebug() << "BackupDialog::done() finished";
 }
 
 // デストラクタの実装を追加
