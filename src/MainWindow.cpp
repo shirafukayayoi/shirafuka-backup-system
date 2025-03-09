@@ -395,6 +395,7 @@ void MainWindow::addBackupCard(const BackupConfig &config)
 
         // カードのシグナルを接続
         connect(card, &BackupCard::runBackup, this, &MainWindow::runBackup);
+        connect(card, &BackupCard::editBackup, this, &MainWindow::editBackup); // 追加: 編集機能接続
         connect(card, &BackupCard::removeBackup, this, &MainWindow::removeBackup);
 
         backupCards.append(card);
@@ -418,32 +419,39 @@ void MainWindow::addBackupCard(const BackupConfig &config)
 // シンプルにして設定ダイアログと同じスタイルに変更
 void MainWindow::showBackupDialog()
 {
-    // Qt標準のダイアログ表示パターンに従い、単純化
     try
     {
-        BackupDialog dialog(this);
-        dialog.setWindowTitle(tr("バックアップの追加"));
+        // ダイアログを生成（ヒープ上に作成）
+        BackupDialog *dialog = new BackupDialog(this);
+        dialog->setWindowTitle(tr("バックアップの追加"));
 
-        // モーダルダイアログとして実行し、結果を取得
-        int result = dialog.exec();
+        // 明示的にQuit on Closeを無効化
+        dialog->setAttribute(Qt::WA_QuitOnClose, false);
 
-        // ダイアログが受け入れられた場合（OKボタン）だけ処理
-        if (result == QDialog::Accepted)
-        {
-            BackupConfig config = dialog.getBackupConfig();
+        // ウィンドウの関係をはっきり設定
+        dialog->setWindowModality(Qt::ApplicationModal);
 
+        // メモリリークを防止するために、ダイアログが閉じられたら自動削除
+        connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
+
+        // exec()の代わりにshowで表示して信号接続
+        connect(dialog, &QDialog::accepted, [this, dialog]()
+                {
+            BackupConfig config = dialog->getBackupConfig();
+            
             // 設定マネージャーに追加
             configManager->addBackupConfig(config);
-
+            
             // 設定を保存
             saveBackupConfigs();
-
+            
             // カードとリストを更新
             loadBackupConfigs();
-
+            
             // ログに記録
-            addLogEntry(QString("新しいバックアップ '%1' を追加しました").arg(config.name()));
-        }
+            addLogEntry(QString("新しいバックアップ '%1' を追加しました").arg(config.name())); });
+
+        dialog->open(); // モードレスダイアログとして開く
     }
     catch (const std::exception &e)
     {
@@ -799,7 +807,8 @@ void MainWindow::handleTableItemDoubleClicked(int row, int column)
         int index = item->data(Qt::UserRole).toInt();
         if (index >= 0 && index < configManager->backupConfigs().size())
         {
-            runBackup(configManager->backupConfigs()[index]);
+            // バックアップ実行の代わりに編集を呼び出す
+            editBackup(index);
         }
     }
 }
@@ -822,12 +831,17 @@ void MainWindow::showTableContextMenu(const QPoint &pos)
 
     QMenu contextMenu(this);
     QAction *runAction = contextMenu.addAction(tr("バックアップ実行"));
+    QAction *editAction = contextMenu.addAction(tr("編集")); // 追加: 編集アクション
     QAction *removeAction = contextMenu.addAction(tr("削除"));
 
     QAction *selectedAction = contextMenu.exec(backupTableWidget->mapToGlobal(pos));
     if (selectedAction == runAction)
     {
         runBackup(configManager->backupConfigs()[index]);
+    }
+    else if (selectedAction == editAction) // 追加: 編集アクション処理
+    {
+        editBackup(index);
     }
     else if (selectedAction == removeAction)
     {
@@ -876,4 +890,65 @@ void MainWindow::runAllBackups()
 
     // 最初のバックアップを開始
     processNextBackup();
+}
+
+// 追加: 編集機能の実装
+void MainWindow::editBackup(int index)
+{
+    if (index < 0 || index >= configManager->backupConfigs().size())
+    {
+        qDebug() << "Invalid backup index for edit:" << index;
+        return;
+    }
+
+    // 編集するバックアップ設定を取得
+    BackupConfig config = configManager->backupConfigs()[index];
+
+    try
+    {
+        // ヒープにダイアログを作成
+        BackupDialog *dialog = new BackupDialog(config, this);
+        dialog->setWindowTitle(tr("バックアップの編集"));
+
+        // 明示的にQuit on Closeを無効化
+        dialog->setAttribute(Qt::WA_QuitOnClose, false);
+
+        // ウィンドウモーダリティを設定
+        dialog->setWindowModality(Qt::ApplicationModal);
+
+        // メモリリークを防止するために、ダイアログが閉じられたら自動削除
+        connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
+
+        // 受け入れられた場合の処理
+        connect(dialog, &QDialog::accepted, [this, dialog, index]()
+                {
+            // 更新された設定を取得
+            BackupConfig updatedConfig = dialog->getBackupConfig();
+            
+            // 設定を更新
+            configManager->updateBackupConfig(index, updatedConfig);
+            
+            // 設定を保存
+            saveBackupConfigs();
+            
+            // UI表示を更新
+            loadBackupConfigs();
+            
+            // ログに記録
+            addLogEntry(QString("バックアップ設定 '%1' を更新しました").arg(updatedConfig.name())); });
+
+        dialog->open(); // モードレスダイアログとして開く
+    }
+    catch (const std::exception &e)
+    {
+        qDebug() << "Exception in editBackup: " << e.what();
+        QMessageBox::critical(this, tr("エラー"),
+                              tr("バックアップ設定の編集中にエラーが発生しました: %1").arg(e.what()));
+    }
+    catch (...)
+    {
+        qDebug() << "Unknown exception in editBackup";
+        QMessageBox::critical(this, tr("エラー"),
+                              tr("バックアップ設定の編集中に不明なエラーが発生しました"));
+    }
 }

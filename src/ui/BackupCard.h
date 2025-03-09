@@ -29,6 +29,7 @@ public:
 signals:
     void runBackup(const BackupConfig &config);
     void removeBackup(int index);
+    void editBackup(int index); // 追加: 編集シグナル
 
 protected:
     void resizeEvent(QResizeEvent *event) override; // 追加
@@ -43,6 +44,7 @@ private:
     QLabel *m_pathLabel;
     QLabel *m_lastBackupLabel;
     QPushButton *m_backupButton;
+    QPushButton *m_editButton; // 追加: 編集ボタン
     QPushButton *m_removeButton;
     QProgressBar *m_progressBar;
 };

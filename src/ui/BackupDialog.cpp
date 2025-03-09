@@ -16,19 +16,39 @@ BackupDialog::BackupDialog(QWidget *parent)
     : QDialog(parent),
       m_backupMode(StandardBackup)
 {
+    // アプリ終了を防止する属性を設定
+    setAttribute(Qt::WA_QuitOnClose, false);
+
+    // モーダルダイアログ設定
+    setModal(true);
+
     setupUI();
     setWindowTitle(tr("バックアップの追加"));
-    setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
+
+    // ウィンドウフラグを完全に再設定
+    setWindowFlags(Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint |
+                   Qt::WindowSystemMenuHint | Qt::WindowCloseButtonHint);
+
     m_saveDataFolderNames = QStringList() << "savedata" << "UserData" << "save" << "Save";
 }
 
 BackupDialog::BackupDialog(const BackupConfig &config, QWidget *parent)
-    : QDialog(parent)
+    : QDialog(parent),
+      m_backupMode(StandardBackup) // m_backupModeを初期化するように修正
 {
+    // アプリ終了を防止する属性を設定
+    setAttribute(Qt::WA_QuitOnClose, false);
+
+    // モーダルダイアログ設定
+    setModal(true);
+
     setupUI();
     loadFromConfig(config);
     setWindowTitle(tr("バックアップの編集"));
-    setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
+
+    // ウィンドウフラグを完全に再設定
+    setWindowFlags(Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint |
+                   Qt::WindowSystemMenuHint | Qt::WindowCloseButtonHint);
 }
 
 void BackupDialog::setupUI()
@@ -446,24 +466,46 @@ void BackupDialog::accept()
     }
 }
 
-// reject()メソッドも同様に修正
+// reject()メソッドを修正
 void BackupDialog::reject()
 {
-    // 基底クラスのrejectを直接呼び出す (QDialogのデフォルト実装)
+    // まず非表示にする
+    hide();
+
+    qDebug() << "BackupDialog: reject called, dialog hidden";
+
+    // 親ウィンドウにフォーカスを戻す
+    if (parentWidget())
+    {
+        parentWidget()->activateWindow();
+        parentWidget()->raise();
+    }
+
+    // 基底クラスのrejectを呼び出す
     QDialog::reject();
 }
 
-// closeEventを完全に書き直し - さらに安全な実装に
+// closeEventを修正 - イベント伝播を確実に止める
 void BackupDialog::closeEvent(QCloseEvent *event)
 {
-    // 単純に閉じるイベントを受け入れる
+    // まずイベントを受け入れる
     event->accept();
+
+    // このダイアログだけを非表示にする
+    hide();
+
+    // reject()を呼び出す
+    reject();
+
+    qDebug() << "BackupDialog: closeEvent handled, dialog hidden";
 }
 
-// done()メソッドを安全に実装
+// done()メソッドを修正
 void BackupDialog::done(int result)
 {
-    // 基底クラスのdoneを直接呼び出す
+    // 非表示に
+    hide();
+    // 基底クラスのdoneを呼ぶ
     QDialog::done(result);
 }
 

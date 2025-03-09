@@ -102,24 +102,31 @@ void BackupCard::setupUI()
     buttonLayout->setSpacing(3);
 
     m_backupButton = new QPushButton(tr("実行"), this);
+    m_editButton = new QPushButton(tr("編集"), this); // 追加: 編集ボタン
     m_removeButton = new QPushButton(tr("削除"), this);
 
     // ボタンを小さく
     m_backupButton->setFixedHeight(22);
+    m_editButton->setFixedHeight(22); // 追加
     m_removeButton->setFixedHeight(22);
 
     QFont buttonFont = m_backupButton->font();
     buttonFont.setPointSize(8);
     m_backupButton->setFont(buttonFont);
+    m_editButton->setFont(buttonFont); // 追加
     m_removeButton->setFont(buttonFont);
 
     buttonLayout->addWidget(m_backupButton);
+    buttonLayout->addWidget(m_editButton); // 追加
     buttonLayout->addWidget(m_removeButton);
     mainLayout->addLayout(buttonLayout);
 
     // シグナル/スロット接続
     connect(m_backupButton, &QPushButton::clicked, [this]()
             { emit runBackup(m_config); });
+
+    connect(m_editButton, &QPushButton::clicked, [this]() // 追加: 編集ボタン接続
+            { emit editBackup(m_index); });
 
     connect(m_removeButton, &QPushButton::clicked, [this]()
             { emit removeBackup(m_index); });

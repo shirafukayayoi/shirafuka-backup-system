@@ -41,6 +41,7 @@ private slots:
     void backupComplete();
     void runBackup(const BackupConfig &config);
     void removeBackup(int index);
+    void editBackup(int index); // 追加: 編集スロット
     void runAllBackups();
     void showSettingsDialog();
     void handleScheduledBackup();
