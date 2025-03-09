@@ -34,10 +34,6 @@ public:
     QStringList excludedExtensions() const;
     void setExcludedExtensions(const QStringList &extensions);
 
-    // 追加: JSON形式の追加データ
-    QJsonObject extraData() const;
-    void setExtraData(const QJsonObject &data);
-
     // JSON変換用メソッド
     QJsonObject toJson() const;
     static BackupConfig fromJson(const QJsonObject &json);
@@ -52,9 +48,6 @@ private:
     QStringList m_excludedFiles;
     QStringList m_excludedFolders;
     QStringList m_excludedExtensions;
-
-    // 追加データ
-    QJsonObject m_extraData;
 };
 
 #endif // BACKUPCONFIG_H

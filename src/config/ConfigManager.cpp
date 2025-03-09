@@ -49,59 +49,29 @@ void ConfigManager::loadConfig()
     }
 }
 
-bool ConfigManager::saveConfig()
+void ConfigManager::saveConfig()
 {
-    try
+    // バックアップ設定を保存
+    QJsonArray backupConfigsArray;
+    for (const BackupConfig &config : m_backupConfigs)
     {
-        qDebug() << "ConfigManager::saveConfig - Saving config with " << m_backupConfigs.size() << " backup configs";
-
-        // バックアップ設定を保存
-        QJsonArray backupConfigsArray;
-        for (const BackupConfig &config : m_backupConfigs)
-        {
-            QJsonObject configJson = config.toJson();
-            if (configJson.isEmpty())
-            {
-                qDebug() << "Warning: Empty JSON object for config: " << config.name();
-                continue;
-            }
-            backupConfigsArray.append(configJson);
-        }
-        m_config["backupConfigs"] = backupConfigsArray;
-
-        // デフォルトバックアップ先を保存
-        m_config["defaultBackupDestination"] = m_defaultBackupDestination;
-
-        QJsonDocument doc(m_config);
-        QFile file(m_configFilePath);
-        if (!file.open(QIODevice::WriteOnly))
-        {
-            qDebug() << "Could not open config file for writing:" << m_configFilePath;
-            return false;
-        }
-
-        qint64 bytesWritten = file.write(doc.toJson());
-        file.close();
-
-        if (bytesWritten <= 0)
-        {
-            qDebug() << "Failed to write config data to file";
-            return false;
-        }
-
-        qDebug() << "Config saved successfully, wrote" << bytesWritten << "bytes";
-        return true;
+        backupConfigsArray.append(config.toJson());
     }
-    catch (const std::exception &e)
+    m_config["backupConfigs"] = backupConfigsArray;
+
+    // デフォルトバックアップ先を保存
+    m_config["defaultBackupDestination"] = m_defaultBackupDestination;
+
+    QJsonDocument doc(m_config);
+    QFile file(m_configFilePath);
+    if (!file.open(QIODevice::WriteOnly))
     {
-        qDebug() << "Exception in saveConfig: " << e.what();
-        return false;
+        qDebug() << "Could not open config file for writing:" << m_configFilePath;
+        return;
     }
-    catch (...)
-    {
-        qDebug() << "Unknown exception in saveConfig";
-        return false;
-    }
+
+    file.write(doc.toJson());
+    file.close();
 }
 
 QList<BackupConfig> ConfigManager::backupConfigs() const
@@ -116,40 +86,7 @@ void ConfigManager::setBackupConfigs(const QList<BackupConfig> &configs)
 
 void ConfigManager::addBackupConfig(const BackupConfig &config)
 {
-    try
-    {
-        qDebug() << "ConfigManager::addBackupConfig - Adding backup config: " << config.name();
-
-        // 設定の最低限の妥当性をチェック
-        if (config.name().isEmpty())
-        {
-            qDebug() << "Warning: Trying to add config with empty name";
-        }
-
-        if (config.sourcePath().isEmpty())
-        {
-            qDebug() << "Warning: Trying to add config with empty source path";
-        }
-
-        if (config.destinationPath().isEmpty())
-        {
-            qDebug() << "Warning: Trying to add config with empty destination path";
-        }
-
-        // 設定を追加
-        m_backupConfigs.append(config);
-        qDebug() << "Config added successfully, current count: " << m_backupConfigs.size();
-    }
-    catch (const std::exception &e)
-    {
-        qDebug() << "Exception in addBackupConfig: " << e.what();
-        throw; // より上位のレイヤーで処理できるように再スロー
-    }
-    catch (...)
-    {
-        qDebug() << "Unknown exception in addBackupConfig";
-        throw; // より上位のレイヤーで処理できるように再スロー
-    }
+    m_backupConfigs.append(config);
 }
 
 void ConfigManager::updateBackupConfig(int index, const BackupConfig &config)

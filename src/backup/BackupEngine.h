@@ -4,8 +4,8 @@
 #include <QObject>
 #include <QFileInfoList>
 #include <QDir>
-#include <QRegularExpression>       // QRegExp から QRegularExpression に変更
-#include "../models/BackupConfig.h" // 明示的にBackupConfigをインクルード
+#include <QRegularExpression> // QRegExp から QRegularExpression に変更
+#include "../models/BackupConfig.h"
 
 class BackupTask;
 
@@ -18,15 +18,17 @@ public:
     ~BackupEngine();
 
     void startBackup(const QString &sourcePath, const QString &destinationPath);
-    void runBackup(const BackupConfig &config); // 既存のメソッドをヘッダーに追加
     void stopBackup();
     bool isRunning() const;
+    void runBackup(const BackupConfig &config);
 
 signals:
     void backupProgress(int progress);
     void backupCompleted();
-    void backupComplete(); // 両方のシグナル名をサポート
-    void backupError(const QString &errorMessage);
+    void backupComplete();
+    void backupError(const QString &message);
+
+    // 新しいシグナル - ファイル単位の処理状況とログメッセージ
     void fileProcessed(const QString &filePath, bool success);
     void directoryProcessed(const QString &dirPath, bool created);
     void backupLogMessage(const QString &message);
@@ -34,6 +36,8 @@ signals:
 private slots:
     void onBackupProgressUpdated(int progress);
     void onBackupFinished();
+
+    // 新しいスロット
     void onFileProcessed(const QString &filePath, bool success);
     void onDirectoryProcessed(const QString &dirPath, bool created);
     void onOperationLog(const QString &message);

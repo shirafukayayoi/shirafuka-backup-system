@@ -22,7 +22,6 @@
 #include <QHeaderView>
 #include <QPointer>
 #include <QDebug>
-#include <QApplication> // 追加: QApplicationクラスをインクルード
 
 // MainWindowのコンストラクタで背景関連の初期化を削除
 MainWindow::MainWindow(QWidget *parent)
@@ -322,141 +321,108 @@ void MainWindow::saveSchedulerSettings()
 // loadBackupConfigsメソッドの更新
 void MainWindow::loadBackupConfigs()
 {
-    try
+    clearBackupCards();
+
+    QList<BackupConfig> configs = configManager->backupConfigs();
+    for (const BackupConfig &config : configs)
     {
-        qDebug() << "Loading backup configs...";
-        clearBackupCards();
-
-        QList<BackupConfig> configs = configManager->backupConfigs();
-        qDebug() << "Found" << configs.size() << "backup configs";
-
-        for (const BackupConfig &config : configs)
-        {
-            qDebug() << "Adding card for config:" << config.name();
-            addBackupCard(config);
-            QApplication::processEvents(); // UIの応答性を維持
-        }
-
-        // テーブルビューも更新
-        if (currentViewMode == ListView)
-        {
-            updateTableView();
-        }
-
-        qDebug() << "Backup configs loaded successfully";
+        addBackupCard(config);
     }
-    catch (const std::exception &e)
+
+    // テーブルビューも更新
+    if (currentViewMode == ListView)
     {
-        qDebug() << "Exception in loadBackupConfigs: " << e.what();
-        QMessageBox::critical(this, tr("エラー"),
-                              tr("バックアップ設定の読み込み中にエラーが発生しました: %1").arg(e.what()));
-    }
-    catch (...)
-    {
-        qDebug() << "Unknown exception in loadBackupConfigs";
-        QMessageBox::critical(this, tr("エラー"),
-                              tr("バックアップ設定の読み込み中に不明なエラーが発生しました"));
+        updateTableView();
     }
 }
 
 void MainWindow::saveBackupConfigs()
 {
-    qDebug() << "Saving backup configs...";
-    bool success = configManager->saveConfig();
-    if (success)
-    {
-        qDebug() << "Backup configs saved successfully";
-    }
-    else
-    {
-        qDebug() << "Failed to save backup configs";
-    }
+    configManager->saveConfig();
 }
 
 // addBackupCardメソッドの更新
 void MainWindow::addBackupCard(const BackupConfig &config)
 {
-    try
+    int cardIndex = backupCards.size();
+    int row = cardIndex / 4; // 4列配置に変更
+    int col = cardIndex % 4; // 列番号（0から3）
+
+    BackupCard *card = new BackupCard(config, cardIndex, backupsContainer);
+
+    // カードのサイズを最適化 - より小さく
+    card->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    card->setFixedHeight(120); // 高さを小さく (150→120)
+
+    // カードをグリッドに追加する際に位置調整
+    backupsLayout->addWidget(card, row, col, 1, 1, Qt::AlignTop);
+
+    // カードのシグナルを接続
+    connect(card, &BackupCard::runBackup, this, &MainWindow::runBackup);
+    connect(card, &BackupCard::removeBackup, this, &MainWindow::removeBackup);
+
+    backupCards.append(card);
+
+    // テーブルビューも更新
+    if (currentViewMode == ListView)
     {
-        int cardIndex = backupCards.size();
-        int row = cardIndex / 4; // 4列配置に変更
-        int col = cardIndex % 4; // 列番号（0から3）
-
-        qDebug() << "Creating card at position:" << row << "," << col << "for config:" << config.name();
-
-        BackupCard *card = new BackupCard(config, cardIndex, backupsContainer);
-
-        // カードのサイズを最適化 - より小さく
-        card->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-        card->setFixedHeight(120); // 高さを小さく (150→120)
-
-        // カードをグリッドに追加する際に位置調整
-        backupsLayout->addWidget(card, row, col, 1, 1, Qt::AlignTop);
-
-        // カードのシグナルを接続
-        connect(card, &BackupCard::runBackup, this, &MainWindow::runBackup);
-        connect(card, &BackupCard::removeBackup, this, &MainWindow::removeBackup);
-
-        backupCards.append(card);
-
-        // テーブルビューも更新
-        if (currentViewMode == ListView)
-        {
-            updateTableView();
-        }
-    }
-    catch (const std::exception &e)
-    {
-        qDebug() << "Exception in addBackupCard:" << e.what();
-    }
-    catch (...)
-    {
-        qDebug() << "Unknown exception in addBackupCard";
+        updateTableView();
     }
 }
 
-// シンプルにして設定ダイアログと同じスタイルに変更
+void MainWindow::clearBackupCards()
+{
+    // 既存のカードを削除
+    for (BackupCard *card : backupCards)
+    {
+        backupsLayout->removeWidget(card);
+        delete card;
+    }
+    backupCards.clear();
+}
+
+// showBackupDialogメソッドを完全に書き換え
+
 void MainWindow::showBackupDialog()
 {
-    // Qt標準のダイアログ表示パターンに従い、単純化
-    try
-    {
-        BackupDialog dialog(this);
-        dialog.setWindowTitle(tr("バックアップの追加"));
+    // 新しいダイアログを作成（親を明示的に指定）
+    BackupDialog *dialog = new BackupDialog(this);
 
-        // モーダルダイアログとして実行し、結果を取得
-        int result = dialog.exec();
+    // 親子関係を明示的に設定
+    dialog->setParent(this, dialog->windowFlags());
 
-        // ダイアログが受け入れられた場合（OKボタン）だけ処理
-        if (result == QDialog::Accepted)
-        {
-            BackupConfig config = dialog.getBackupConfig();
+    // DeleteOnClose属性を設定せず、代わりにconnectedオブジェクトが削除されるときに
+    // 自動的に切断されるQtの機能を利用
 
-            // 設定マネージャーに追加
-            configManager->addBackupConfig(config);
+    // ダイアログの閉じる処理（Finished）を監視
+    connect(dialog, &QDialog::finished, [dialog](int)
+            {
+        qDebug() << "ダイアログが閉じられ、finished シグナルを発行しました";
+        // 明示的に後で削除するようスケジュール
+        dialog->deleteLater(); });
 
-            // 設定を保存
-            saveBackupConfigs();
+    // バックアップ要求シグナルを処理
+    connect(dialog, &BackupDialog::backupRequested,
+            this, [this, dialog](const QString &source, const QString &dest)
+            {
+                qDebug() << "バックアップ要求: " << source << " -> " << dest;
+                // バックアップ処理をここに記述...
+            });
 
-            // カードとリストを更新
-            loadBackupConfigs();
+    // バックアップキャンセルシグナルを処理
+    connect(dialog, &BackupDialog::backupCancelled,
+            this, [this, dialog]()
+            {
+                qDebug() << "バックアップがキャンセルされました";
+                // キャンセル処理をここに記述...
+            });
 
-            // ログに記録
-            addLogEntry(QString("新しいバックアップ '%1' を追加しました").arg(config.name()));
-        }
-    }
-    catch (const std::exception &e)
-    {
-        qDebug() << "Exception in showBackupDialog: " << e.what();
-        QMessageBox::critical(this, tr("エラー"),
-                              tr("バックアップ設定の追加中にエラーが発生しました: %1").arg(e.what()));
-    }
-    catch (...)
-    {
-        qDebug() << "Unknown exception in showBackupDialog";
-        QMessageBox::critical(this, tr("エラー"),
-                              tr("バックアップ設定の追加中に不明なエラーが発生しました"));
-    }
+    // ダイアログを表示
+    dialog->show();
+
+    // ダイアログをアクティブウィンドウにする
+    dialog->activateWindow();
+    dialog->raise();
 }
 
 void MainWindow::runBackup(const BackupConfig &config)
@@ -470,11 +436,8 @@ void MainWindow::runBackup(const BackupConfig &config)
     }
 
     addLogEntry(QString("バックアップ開始: %1 → %2").arg(config.sourcePath()).arg(config.destinationPath()));
+    backupEngine->startBackup(config.sourcePath(), config.destinationPath());
 
-    // startBackupの代わりにrunBackupを使用して設定情報を渡す
-    backupEngine->runBackup(config);
-
-    // ステータスバーメッセージを設定
     statusBar()->showMessage("バックアップ実行中...");
 }
 
@@ -521,7 +484,6 @@ void MainWindow::updateBackupProgress(int progress)
     }
 }
 
-// バックアップ完了時のステータス更新処理を改善
 void MainWindow::backupComplete()
 {
     // バッチバックアップ実行中の場合
@@ -543,10 +505,55 @@ void MainWindow::backupComplete()
     }
 }
 
+// 以前の実装に加えて、新しい関数を追加
+
+void MainWindow::runAllBackups()
+{
+    qDebug() << "runAllBackups called"; // デバッグ出力を追加
+
+    // 既に実行中の場合は何もしない
+    if (isRunningBatchBackup)
+    {
+        statusBar()->showMessage(tr("バックアップが既に実行中です"));
+        qDebug() << "バックアップが既に実行中です";
+        return;
+    }
+
+    // バックアップ設定のリストを取得
+    QVector<BackupConfig> configs = configManager->backupConfigs();
+    if (configs.isEmpty())
+    {
+        QMessageBox::information(this, tr("バックアップ"), tr("バックアップ設定がありません。"));
+        qDebug() << "バックアップ設定がありません";
+        return;
+    }
+
+    qDebug() << "バックアップ設定数: " << configs.size(); // デバッグ出力を追加
+
+    // キューをクリアして設定を追加
+    backupQueue.clear();
+    for (const BackupConfig &config : configs)
+    {
+        backupQueue.enqueue(config);
+    }
+
+    // カウンターを初期化
+    totalBackupsInQueue = backupQueue.size();
+    currentBackupIndex = 0;
+    isRunningBatchBackup = true;
+
+    // ステータスバー表示の更新
+    statusBar()->showMessage(tr("一括バックアップを開始します..."));
+
+    // 最初のバックアップを開始
+    processNextBackup();
+}
+
 // processNextBackupメソッド内のカード進捗表示部分を修正
 void MainWindow::processNextBackup()
 {
     qDebug() << "processNextBackup called, queue size: " << backupQueue.size();
+
     if (backupQueue.isEmpty())
     {
         // すべてのバックアップが完了
@@ -568,8 +575,12 @@ void MainWindow::processNextBackup()
     qDebug() << "バックアップ実行: " << config.name() << " (" << currentBackupIndex
              << "/" << totalBackupsInQueue << ")";
 
-    // 設定を直接渡して、セーブデータモードを尊重
-    backupEngine->runBackup(config);
+    // *** バックアップエンジンを直接使用 ***
+    // カードのボタン経由ではなく、直接backupEngineを使用
+    backupEngine->startBackup(config.sourcePath(), config.destinationPath());
+
+    // 注意: バックアップの完了は backupComplete() で処理される
+    // そこから次のprocessNextBackup()を呼び出す
 
     // カードの進捗表示を更新（オプション）
     int cardIndex = configManager->findConfigIndex(config);
@@ -578,107 +589,6 @@ void MainWindow::processNextBackup()
         // startProgress()ではなくsetProgress()を使用
         backupCards[cardIndex]->setProgress(0); // 進捗を0%から開始
     }
-}
-
-// MainWindow.cppでのaddBackupボタンの処理部分
-void MainWindow::addBackup()
-{
-    // 親ウィジェットを明示的に指定してダイアログを作成
-    BackupDialog *dialog = new BackupDialog(this);
-
-    // モーダルダイアログに設定
-    dialog->setModal(true);
-
-    // ダイアログが閉じられたときのメモリ管理
-    connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
-
-    // ダイアログを接続
-    connect(dialog, &QDialog::accepted, this, [this, dialog]()
-            {
-                try {
-                    // ダイアログから設定を取得
-                    BackupConfig config = dialog->getBackupConfig();
-                    
-                    qDebug() << "Adding backup config from dialog: " << config.name();
-                    
-                    // 設定マネージャーに追加
-                    configManager->addBackupConfig(config);
-                    saveBackupConfigs();
-                    
-                    // カードとリストを更新
-                    loadBackupConfigs();
-                    
-                    // ログに表示
-                    addLogEntry(QString("新しいバックアップ '%1' を追加しました").arg(config.name()));
-                    
-                    qDebug() << "New backup config added successfully: " << config.name();
-                    
-                } catch (const std::exception &e) {
-                    qDebug() << "Exception during backup config processing: " << e.what();
-                    QMessageBox::critical(this, tr("エラー"),
-                        tr("バックアップ設定の追加中にエラーが発生しました: %1").arg(e.what()));
-                } catch (...) {
-                    qDebug() << "Unknown exception during backup config processing";
-                    QMessageBox::critical(this, tr("エラー"),
-                        tr("バックアップ設定の追加中に不明なエラーが発生しました"));
-                } });
-
-    // モーダルダイアログとして実行
-    dialog->exec();
-}
-
-// 新しいスロット実装
-void MainWindow::onFileProcessed(const QString &filePath, bool success)
-{
-    // ファイルのバックアップ状況をログに記録
-    if (success)
-    {
-        QFileInfo fileInfo(filePath);
-        addLogEntry(tr("ファイルをバックアップしました: %1").arg(fileInfo.fileName()));
-    }
-    else
-    {
-        QFileInfo fileInfo(filePath);
-        addLogEntry(tr("ファイルのバックアップに失敗しました: %1").arg(fileInfo.fileName()));
-    }
-}
-
-void MainWindow::onDirectoryProcessed(const QString &dirPath, bool created)
-{
-    // ディレクトリ作成状況をログに記録
-    if (created)
-    {
-        QFileInfo dirInfo(dirPath);
-        addLogEntry(tr("フォルダを作成しました: %1").arg(dirInfo.fileName()));
-    }
-    else
-    {
-        QFileInfo dirInfo(dirPath);
-        addLogEntry(tr("フォルダの作成に失敗しました: %1").arg(dirInfo.fileName()));
-    }
-}
-
-void MainWindow::onBackupLogMessage(const QString &message)
-{
-    addLogEntry(message);
-}
-
-void MainWindow::clearBackupCards()
-{
-    qDebug() << "Clearing all backup cards...";
-
-    // 既存のカードを削除
-    for (BackupCard *card : backupCards)
-    {
-        if (card)
-        {
-            backupsLayout->removeWidget(card);
-            card->deleteLater(); // deleteより安全なdeleteLaterを使用
-        }
-    }
-    backupCards.clear();
-
-    qDebug() << "All backup cards cleared";
 }
 
 void MainWindow::showLogDialog()
@@ -711,6 +621,7 @@ void MainWindow::addLogEntry(const QString &entry)
 void MainWindow::switchViewMode(ViewMode mode)
 {
     currentViewMode = mode;
+
     if (mode == CardView)
     {
         viewStack->setCurrentWidget(scrollArea);
@@ -718,8 +629,8 @@ void MainWindow::switchViewMode(ViewMode mode)
     else
     {
         // テーブルビューに切り替え
-        viewStack->setCurrentWidget(backupTableWidget);
         updateTableView();
+        viewStack->setCurrentWidget(backupTableWidget);
     }
 }
 
@@ -825,6 +736,7 @@ void MainWindow::showTableContextMenu(const QPoint &pos)
     QAction *removeAction = contextMenu.addAction(tr("削除"));
 
     QAction *selectedAction = contextMenu.exec(backupTableWidget->mapToGlobal(pos));
+
     if (selectedAction == runAction)
     {
         runBackup(configManager->backupConfigs()[index]);
@@ -835,45 +747,61 @@ void MainWindow::showTableContextMenu(const QPoint &pos)
     }
 }
 
-// runAllBackupsメソッドの完全な実装を追加
-void MainWindow::runAllBackups()
+// MainWindow.cppでのaddBackupボタンの処理部分
+
+void MainWindow::addBackup()
 {
-    qDebug() << "runAllBackups called";
+    // 親ウィジェットを明示的に指定してダイアログを作成
+    BackupDialog *dialog = new BackupDialog(this);
 
-    // 既に実行中の場合は何もしない
-    if (isRunningBatchBackup)
+    // モーダル（モードレス）動作を明示的に設定
+    // モーダル：親ウィンドウを操作できなくなる
+    dialog->setModal(true);
+
+    // ダイアログを接続
+    connect(dialog, &BackupDialog::accepted, this, [this, dialog]()
+            {
+                // ...existing code...
+            });
+
+    // 通常のshow()の代わりにexec()を使う場合は注意
+    // exec()はモーダルダイアログを表示してユーザーの応答を待ちます
+    dialog->exec(); // または dialog->show();
+}
+
+// 新しいスロット実装
+void MainWindow::onFileProcessed(const QString &filePath, bool success)
+{
+    // ファイルのバックアップ状況をログに記録
+    if (success)
     {
-        statusBar()->showMessage(tr("バックアップが既に実行中です"));
-        qDebug() << "バックアップが既に実行中です";
-        return;
+        QFileInfo fileInfo(filePath);
+        addLogEntry(tr("ファイルをバックアップしました: %1").arg(fileInfo.fileName()));
     }
-
-    // バックアップ設定のリストを取得
-    QVector<BackupConfig> configs = configManager->backupConfigs();
-    if (configs.isEmpty())
+    else
     {
-        QMessageBox::information(this, tr("バックアップ"), tr("バックアップ設定がありません。"));
-        qDebug() << "バックアップ設定がありません";
-        return;
+        QFileInfo fileInfo(filePath);
+        addLogEntry(tr("ファイルのバックアップに失敗しました: %1").arg(fileInfo.fileName()));
     }
+}
 
-    qDebug() << "バックアップ設定数: " << configs.size();
-
-    // キューをクリアして設定を追加
-    backupQueue.clear();
-    for (const BackupConfig &config : configs)
+void MainWindow::onDirectoryProcessed(const QString &dirPath, bool created)
+{
+    // ディレクトリ作成状況をログに記録
+    if (created)
     {
-        backupQueue.enqueue(config);
+        QFileInfo dirInfo(dirPath);
+        addLogEntry(tr("フォルダを作成しました: %1").arg(dirInfo.fileName()));
     }
+    else
+    {
+        QFileInfo dirInfo(dirPath);
+        addLogEntry(tr("フォルダの作成に失敗しました: %1").arg(dirInfo.fileName()));
+    }
+}
 
-    // カウンターを初期化
-    totalBackupsInQueue = backupQueue.size();
-    currentBackupIndex = 0;
-    isRunningBatchBackup = true;
-
-    // ステータスバー表示の更新
-    statusBar()->showMessage(tr("一括バックアップを開始します..."));
-
-    // 最初のバックアップを開始
-    processNextBackup();
+void MainWindow::onBackupLogMessage(const QString &message)
+{
+    // バックアップ処理からのログメッセージを記録
+    addLogEntry(message);
 }

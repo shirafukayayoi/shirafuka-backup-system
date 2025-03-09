@@ -9,9 +9,8 @@
 #include <QCheckBox>
 #include <QProgressBar>
 #include <QMessageBox>
-#include <QCloseEvent>
-#include <QTimer>
-#include <QRadioButton> // 追加: QRadioButtonのヘッダー
+#include <QCloseEvent> // 追加: QCloseEvent用
+#include <QTimer>      // 追加: QTimer用
 #include "../models/BackupConfig.h"
 #include "FolderSelector.h" // FolderSelectorをインクルード
 
@@ -22,7 +21,7 @@ class BackupDialog : public QDialog
 public:
     explicit BackupDialog(QWidget *parent = nullptr);
     explicit BackupDialog(const BackupConfig &config, QWidget *parent = nullptr);
-    ~BackupDialog(); // デストラクタの宣言のみ、実装は削除
+    ~BackupDialog(); // デストラクタを追加
 
     QString title() const;
     QString sourcePath() const;
@@ -34,21 +33,8 @@ public:
 
     BackupConfig getBackupConfig() const;
 
-    // バックアップモード追加
-    enum BackupMode
-    {
-        StandardBackup,
-        GameSaveBackup
-    };
-
-    BackupMode backupMode() const;
-    void setBackupMode(BackupMode mode);
-    QStringList saveDataFolderNames() const;
-
 protected:
-    // 重複宣言を削除して一つに統一
-    void closeEvent(QCloseEvent *event) override;
-    void reject() override;
+    void closeEvent(QCloseEvent *event) override; // 明示的にoverrideとして宣言
 
 private slots:
     void startBackup();
@@ -62,8 +48,8 @@ public slots:
     void updateProgress(int value);
     void backupFinished();
     void accept() override;
-    // 重複している reject() の宣言をここから削除
-    void done(int result) override;
+    void reject() override;
+    void done(int result) override; // 明示的にoverrideとして宣言
 
 signals:
     void backupRequested(const QString &source, const QString &destination);
@@ -93,13 +79,6 @@ private:
     QPlainTextEdit *excludedFoldersEdit;    // 除外フォルダー
     QPlainTextEdit *excludedExtensionsEdit; // 除外拡張子
     QCheckBox *showHiddenFilesCheck;        // オプション：隠しファイルを表示するかのオプション
-
-    // セーブデータバックアップ関連のUI要素
-    QRadioButton *standardBackupRadio;
-    QRadioButton *saveDataBackupRadio;
-    QPlainTextEdit *saveDataFoldersEdit;
-    BackupMode m_backupMode;
-    QStringList m_saveDataFolderNames;
 };
 
 #endif // BACKUPDIALOG_H
