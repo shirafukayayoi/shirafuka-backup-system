@@ -9,7 +9,6 @@
 #include <QLineEdit>
 #include <QFileDialog>
 #include <QStandardPaths>
-#include <QSlider>
 #include <QDialogButtonBox>
 #include <QMessageBox>
 #include <QDebug>
@@ -19,11 +18,8 @@ SettingsDialog::SettingsDialog(QWidget *parent)
       // 直接初期化リストでQSettingsを初期化
       m_settings(QDir::homePath() + "/shirafuka_settings.ini", QSettings::IniFormat),
       m_tabWidget(nullptr),
-      m_buttonBox(nullptr),
-      m_useBackgroundCheck(nullptr),
-      m_backgroundPathEdit(nullptr),
-      m_opacitySlider(nullptr),
-      m_imagePreview(nullptr)
+      m_buttonBox(nullptr)
+// 背景関連の変数を削除
 {
     setWindowTitle(tr("設定"));
     resize(500, 400);
@@ -46,76 +42,10 @@ void SettingsDialog::setupUI()
     // タブウィジェット
     m_tabWidget = new QTabWidget(this);
 
-    // --- 外観設定タブ ---
-    QWidget *appearanceTab = new QWidget(m_tabWidget);
-    QVBoxLayout *appearanceLayout = new QVBoxLayout(appearanceTab);
+    // --- 外観設定タブ削除 ---
+    // 背景画像設定のグループボックスとすべての関連コードを削除
 
-    // 背景画像設定のグループボックス
-    QGroupBox *backgroundGroup = new QGroupBox(tr("背景画像"), appearanceTab);
-    QVBoxLayout *bgLayout = new QVBoxLayout(backgroundGroup);
-
-    // 背景画像の使用有無を選択するチェックボックス
-    m_useBackgroundCheck = new QCheckBox(tr("背景画像を使用する"));
-    m_useBackgroundCheck->setChecked(m_settings.value("Background/UseBackgroundImage", false).toBool());
-    bgLayout->addWidget(m_useBackgroundCheck);
-
-    // 画像パス設定
-    QHBoxLayout *pathLayout = new QHBoxLayout();
-    QLabel *pathLabel = new QLabel(tr("画像パス:"));
-    m_backgroundPathEdit = new QLineEdit(m_settings.value("Background/BackgroundImagePath", "").toString());
-    QPushButton *browseButton = new QPushButton(tr("参照..."));
-
-    pathLayout->addWidget(pathLabel);
-    pathLayout->addWidget(m_backgroundPathEdit);
-    pathLayout->addWidget(browseButton);
-    bgLayout->addLayout(pathLayout);
-
-    // 現在の背景のプレビュー
-    QLabel *previewLabel = new QLabel(tr("プレビュー:"));
-    m_imagePreview = new QLabel();
-    m_imagePreview->setMinimumSize(200, 120);
-    m_imagePreview->setAlignment(Qt::AlignCenter);
-    m_imagePreview->setFrameShape(QFrame::StyledPanel);
-
-    QString currentPath = m_settings.value("Background/BackgroundImagePath", "").toString();
-    if (!currentPath.isEmpty())
-    {
-        QPixmap preview = QPixmap(currentPath).scaled(200, 120, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-        if (!preview.isNull())
-        {
-            m_imagePreview->setPixmap(preview);
-        }
-        else
-        {
-            m_imagePreview->setText(tr("画像を読み込めません"));
-        }
-    }
-    else
-    {
-        m_imagePreview->setText(tr("画像なし"));
-    }
-
-    bgLayout->addWidget(previewLabel);
-    bgLayout->addWidget(m_imagePreview);
-
-    // 透明度スライダー
-    QHBoxLayout *opacityLayout = new QHBoxLayout();
-    QLabel *opacityLabel = new QLabel(tr("透明度:"));
-    m_opacitySlider = new QSlider(Qt::Horizontal);
-    m_opacitySlider->setRange(0, 100);
-    m_opacitySlider->setValue(m_settings.value("Background/Opacity", 80).toInt());
-    QLabel *opacityValue = new QLabel(QString("%1%").arg(m_opacitySlider->value()));
-
-    opacityLayout->addWidget(opacityLabel);
-    opacityLayout->addWidget(m_opacitySlider);
-    opacityLayout->addWidget(opacityValue);
-    bgLayout->addLayout(opacityLayout);
-
-    // 背景グループを外観タブに追加
-    appearanceLayout->addWidget(backgroundGroup);
-    appearanceLayout->addStretch();
-
-    // --- スケジュール設定タブ（新しく追加） ---
+    // --- スケジュール設定タブ ---
     QWidget *scheduleTab = new QWidget(m_tabWidget);
     QVBoxLayout *scheduleLayout = new QVBoxLayout(scheduleTab);
 
@@ -191,35 +121,9 @@ void SettingsDialog::setupUI()
     connect(m_scheduledTimeEdit, &QTimeEdit::timeChanged, this, &SettingsDialog::updateNextBackupDisplay);
     connect(m_periodicIntervalSpinBox, &QSpinBox::valueChanged, this, &SettingsDialog::updateNextBackupDisplay);
 
-    // 参照ボタンのシグナル接続
-    connect(browseButton, &QPushButton::clicked, [this]()
-            {
-        QString imagePath = QFileDialog::getOpenFileName(this, 
-            tr("背景画像を選択"), 
-            QDir::homePath(), // ホームディレクトリから開始
-            tr("画像ファイル (*.png *.jpg *.jpeg *.bmp *.gif)"));
-            
-        if (!imagePath.isEmpty()) {
-            m_backgroundPathEdit->setText(imagePath);
-            
-            // プレビューを更新
-            QPixmap preview = QPixmap(imagePath).scaled(
-                200, 120, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-            if (!preview.isNull()) {
-                m_imagePreview->setPixmap(preview);
-                qDebug() << "プレビュー画像を読み込みました: " << imagePath;
-            } else {
-                m_imagePreview->setText(tr("画像を読み込めません"));
-                qDebug() << "プレビュー画像の読み込みに失敗: " << imagePath;
-            }
-        } });
+    // 背景設定関連のコード削除
 
-    // スライダーの値が変更されたときに、ラベルを更新
-    connect(m_opacitySlider, &QSlider::valueChanged, [opacityValue](int value)
-            { opacityValue->setText(QString("%1%").arg(value)); });
-
-    // タブに追加
-    m_tabWidget->addTab(appearanceTab, tr("外観"));
+    // タブに追加 (外観タブを削除して、スケジュールタブのみに)
     m_tabWidget->addTab(scheduleTab, tr("スケジュール"));
 
     mainLayout->addWidget(m_tabWidget);
@@ -246,24 +150,14 @@ void SettingsDialog::setupUI()
     m_periodicIntervalSpinBox->setEnabled(m_periodicEnabledCheckBox->isChecked());
 }
 
-// 設定保存部分を強化
-
-// 明示的なファイルパスでQSettingsを初期化
-
+// 設定保存処理から背景設定を削除
 void SettingsDialog::saveSettings()
 {
-    // 背景画像設定の保存
-    bool useBackground = m_useBackgroundCheck->isChecked();
-    QString path = m_backgroundPathEdit->text().trimmed(); // 余分なスペースを削除
-    int opacity = m_opacitySlider->value();
+    // 背景画像設定の保存コードを削除
 
-    // 設定を明示的なファイルパスで保存
+    // 明示的なファイルパスで保存
     QString settingsPath = QDir::homePath() + "/shirafuka_settings.ini";
     QSettings settings(settingsPath, QSettings::IniFormat);
-
-    settings.setValue("Background/UseBackgroundImage", useBackground);
-    settings.setValue("Background/BackgroundImagePath", path);
-    settings.setValue("Background/Opacity", opacity);
 
     // スケジュール設定の保存
     settings.setValue("Schedule/ScheduleEnabled", m_scheduleEnabledCheckBox->isChecked());
@@ -276,7 +170,6 @@ void SettingsDialog::saveSettings()
 
     // 設定が保存されたことを確認
     qDebug() << "設定ファイル: " << settings.fileName();
-    qDebug() << "保存後の確認読み取り: " << settings.value("Background/BackgroundImagePath").toString();
 
     // 同じ設定ファイルを使うように他のクラスに知らせる
     QSettings::setDefaultFormat(QSettings::IniFormat);
@@ -372,47 +265,10 @@ void SettingsDialog::updateNextBackupDisplay()
     }
 }
 
-// 設定読み込みメソッドを追加
+// 設定読み込みメソッドから背景設定を削除
 void SettingsDialog::loadSettings()
 {
-    // 設定を読み込む
-    bool useBackground = m_settings.value("Background/UseBackgroundImage", false).toBool();
-    QString imagePath = m_settings.value("Background/BackgroundImagePath", "").toString();
-    int opacity = m_settings.value("Background/Opacity", 80).toInt();
-
-    qDebug() << "設定ダイアログが読み込んだ設定: 使用=" << useBackground
-             << ", パス=" << imagePath
-             << ", 透明度=" << opacity;
-
-    // UI要素に反映
-    if (m_useBackgroundCheck)
-    {
-        m_useBackgroundCheck->setChecked(useBackground);
-    }
-
-    if (m_backgroundPathEdit)
-    {
-        m_backgroundPathEdit->setText(imagePath);
-    }
-
-    if (m_opacitySlider)
-    {
-        m_opacitySlider->setValue(opacity);
-    }
-
-    // プレビュー画像を更新
-    if (m_imagePreview && !imagePath.isEmpty())
-    {
-        QPixmap preview = QPixmap(imagePath).scaled(200, 120, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-        if (!preview.isNull())
-        {
-            m_imagePreview->setPixmap(preview);
-        }
-        else
-        {
-            m_imagePreview->setText(tr("画像を読み込めません"));
-        }
-    }
+    // 背景設定を読み込むコードを削除
 
     // スケジュール設定を読み込む
     bool scheduleEnabled = m_settings.value("Schedule/ScheduleEnabled", false).toBool();

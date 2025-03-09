@@ -9,7 +9,6 @@
 #include <QTabWidget>
 #include <QGroupBox>
 #include <QLabel>
-#include <QSlider>
 #include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QStandardPaths>
@@ -47,21 +46,17 @@ signals:
 private:
     void setupUI();
     void saveSettings();
-    void updateNextBackupDisplay(); // この行を追加
-    void loadSettings();            // 追加: 設定読み込みメソッド
+    void updateNextBackupDisplay();
+    void loadSettings();
 
-    // QSettings変数を追加
+    // QSettings変数
     QSettings m_settings;
 
-    // UI要素のポインタ（必要に応じて）
+    // UI要素のポインタ
     QTabWidget *m_tabWidget;
     QDialogButtonBox *m_buttonBox;
 
-    // 背景設定用のUI変数
-    QCheckBox *m_useBackgroundCheck;
-    QLineEdit *m_backgroundPathEdit;
-    QSlider *m_opacitySlider;
-    QLabel *m_imagePreview;
+    // 背景設定用のUI変数を削除
 
 private:
     QCheckBox *m_scheduleEnabledCheckBox;

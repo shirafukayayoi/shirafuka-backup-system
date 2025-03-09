@@ -13,7 +13,7 @@
 #include <QStackedWidget>
 #include <QButtonGroup>
 #include <QToolButton>
-#include <QTableWidget> // 追加: QTableWidgetのインクルード
+#include <QTableWidget>
 #include <QPixmap>
 #include <QBrush>
 
@@ -33,7 +33,7 @@ public:
     ~MainWindow();
 
 public slots:
-    void testBackgroundImage(); // 追加: テスト用背景画像選択関数
+    // 背景画像テスト関数を削除
 
 private slots:
     void showBackupDialog();
@@ -45,18 +45,15 @@ private slots:
     void showSettingsDialog();
     void handleScheduledBackup();
     void showLogDialog();
-    void switchToCardView();                                // カードビューに切り替え
-    void switchToListView();                                // リストビューに切り替え
-    void handleTableItemDoubleClicked(int row, int column); // テーブルアイテムダブルクリック
-    void showTableContextMenu(const QPoint &pos);           // テーブルのコンテキストメニュー
-    void showBackgroundDialog();                            // 背景画像設定ダイアログを表示するスロット
-    void setBackgroundImage(const QString &imagePath);      // 背景画像を設定するスロット
-    void clearBackgroundImage();                            // 背景画像をクリアするスロット
-    void addBackup();                                       // 追加
-    void showDisabledBackgroundDialog();                    // 追加
+    void switchToCardView();
+    void switchToListView();
+    void handleTableItemDoubleClicked(int row, int column);
+    void showTableContextMenu(const QPoint &pos);
+    // 背景画像関連のスロットを削除
+    void addBackup();
 
 protected:
-    void paintEvent(QPaintEvent *event) override; // 背景を描画するために必要
+    // paintEvent を削除（背景描画に使用していたため）
 
 public:
     void addLogEntry(const QString &entry);
@@ -72,12 +69,12 @@ private:
     void loadBackupConfigs();
     void saveBackupConfigs();
     void addBackupCard(const BackupConfig &config);
-    void updateTableView(); // テーブルビューを更新
+    void updateTableView();
     void clearBackupCards();
     void processNextBackup();
     void loadSchedulerSettings();
     void saveSchedulerSettings();
-    void switchViewMode(ViewMode mode); // 表示モード切替
+    void switchViewMode(ViewMode mode);
 
     BackupEngine *backupEngine;
     ConfigManager *configManager;
@@ -87,7 +84,7 @@ private:
     QScrollArea *scrollArea;
     QWidget *backupsContainer;
     QGridLayout *backupsLayout;
-    QTableWidget *backupTableWidget; // QListWidgetからQTableWidgetに変更
+    QTableWidget *backupTableWidget;
     QStackedWidget *viewStack;
 
     // ボタン
@@ -115,17 +112,9 @@ private:
 
     bool isAutomaticBackup; // 自動バックアップフラグ
 
-    // 背景画像関連
-    QPixmap m_backgroundImage;
-    QString m_backgroundImagePath;
-    bool m_useBackgroundImage;
-    int m_backgroundOpacity;
+    // 背景画像関連のメンバ変数を削除
 
-    // 設定の読み込み/保存
-    void loadBackgroundSettings();
-    void saveBackgroundSettings();
-    void setDefaultBackground();  // 追加: デフォルト背景設定関数
-    void setupTransparentStyle(); // 追加: 透明スタイル設定メソッド
+    // 背景画像設定の読み込み/保存メソッドを削除
 };
 
 #endif // MAINWINDOW_H

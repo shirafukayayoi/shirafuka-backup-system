@@ -17,54 +17,13 @@
 #include <QJsonDocument>
 #include <QScrollBar>
 #include <QSettings>
-#include <QTableWidget>     // 追加: QTableWidgetのヘッダー
-#include <QTableWidgetItem> // 追加: QTableWidgetItemのヘッダー
-#include <QHeaderView>      // 追加: QHeaderViewのヘッダー
-#include <QPainter>
-#include <QFileDialog>
-#include <QStandardPaths>
-#include <QGraphicsBlurEffect>
+#include <QTableWidget>
+#include <QTableWidgetItem>
+#include <QHeaderView>
 #include <QPointer>
 #include <QDebug>
 
-// 背景画像描画の根本的な問題を修正
-
-// まず、カスタムセントラルウィジェットを作成して背景描画を担当させる
-class BackgroundWidget : public QWidget
-{
-public:
-    BackgroundWidget(QWidget *parent = nullptr) : QWidget(parent) {}
-
-    void setBackgroundImage(const QPixmap &image, int opacity)
-    {
-        m_backgroundImage = image;
-        m_opacity = opacity;
-        update();
-    }
-
-protected:
-    void paintEvent(QPaintEvent *event) override
-    {
-        QPainter painter(this);
-
-        // 既存のウィジェットを描画
-        QWidget::paintEvent(event);
-
-        // その後、背景画像を下に描画
-        if (!m_backgroundImage.isNull())
-        {
-            painter.setCompositionMode(QPainter::CompositionMode_DestinationOver);
-            painter.setOpacity(m_opacity / 100.0);
-            painter.drawPixmap(rect(), m_backgroundImage, m_backgroundImage.rect());
-        }
-    }
-
-private:
-    QPixmap m_backgroundImage;
-    int m_opacity = 80;
-};
-
-// MainWindowのコンストラクタで初期化
+// MainWindowのコンストラクタで背景関連の初期化を削除
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
       backupEngine(new BackupEngine(this)),
@@ -73,9 +32,7 @@ MainWindow::MainWindow(QWidget *parent)
       totalBackupsInQueue(0),
       logDialog(nullptr),
       currentViewMode(CardView),
-      isAutomaticBackup(false),    // 追加
-      m_useBackgroundImage(false), // 常にfalseに固定
-      m_backgroundOpacity(80)
+      isAutomaticBackup(false) // 追加
 {
     // 設定ファイルのパスを定義
     QString configPath = QDir::homePath() + "/.shirafuka_backup/config.json";
@@ -108,39 +65,6 @@ MainWindow::MainWindow(QWidget *parent)
     // シグナル/スロット接続
     connect(backupEngine, &BackupEngine::backupProgress, this, &MainWindow::updateBackupProgress);
     connect(backupEngine, &BackupEngine::backupCompleted, this, &MainWindow::backupComplete);
-
-    // 背景画像の設定を読み込む - コメントアウトして無効化
-    // loadBackgroundSettings();
-
-    // メニューに背景設定を追加 - 背景設定メニューを無効化
-    QMenu *viewMenu = menuBar()->addMenu(tr("表示"));
-    QAction *backgroundAction = viewMenu->addAction(tr("背景画像設定..."));
-    backgroundAction->setEnabled(false); // 無効化
-
-    // ラムダ式を使用して無効化メッセージを表示
-    connect(backgroundAction, &QAction::triggered, this, [this]()
-            { QMessageBox::information(this, tr("背景画像機能は無効化されています"),
-                                       tr("背景画像機能は現在無効化されています。\nパフォーマンスと安定性の向上のため、この機能は利用できません。")); });
-
-    // テスト用メニュー追加 - 背景画像テストも無効化
-    QMenu *debugMenu = menuBar()->addMenu("デバッグ");
-    QAction *testBgAction = debugMenu->addAction("背景画像テスト...");
-    testBgAction->setEnabled(false); // 無効化
-
-    // 同じラムダ式を使用
-    connect(testBgAction, &QAction::triggered, this, [this]()
-            { QMessageBox::information(this, tr("背景画像機能は無効化されています"),
-                                       tr("背景画像機能は現在無効化されています。\nパフォーマンスと安定性の向上のため、この機能は利用できません。")); });
-
-    // 既存の背景がなければ、デフォルト背景を提供 - コメントアウト
-    // if (!m_useBackgroundImage || m_backgroundImage.isNull())
-    // {
-    //     // デフォルト背景の提供（オプション）
-    //     // setDefaultBackground();
-    // }
-
-    // カード部分を半透明にするスタイル設定
-    setupTransparentStyle();
 }
 
 MainWindow::~MainWindow()
@@ -158,7 +82,7 @@ void MainWindow::setupUI()
     // メニューバーを非表示にする
     menuBar()->setVisible(false);
 
-    // 表示スタックウィジェット（カードとリストの切り替え用）
+    // 表示スタックウィジェット（カードとリストの切り替え用）を作成
     viewStack = new QStackedWidget(this);
 
     // カードビュー
@@ -285,9 +209,6 @@ void MainWindow::showSettingsDialog()
 
     if (dialog.exec() == QDialog::Accepted)
     {
-        // 背景設定を再読み込み
-        loadBackgroundSettings();
-
         // スケジューラ設定を更新
         backupScheduler->setScheduleEnabled(dialog.isScheduleEnabled());
         backupScheduler->setScheduledTime(dialog.scheduledTime());
@@ -819,395 +740,6 @@ void MainWindow::showTableContextMenu(const QPoint &pos)
     }
 }
 
-// paintEventメソッドを修正して透明度を確実に適用
-
-void MainWindow::paintEvent(QPaintEvent *event)
-{
-    // 既存のウィジェット描画
-    QMainWindow::paintEvent(event);
-
-    // 背景画像を描画 - 完全に無効化
-    // if (m_useBackgroundImage && !m_backgroundImage.isNull())
-    // {
-    //     QPainter painter(this);
-
-    //     // 背景画像は他のウィジェットの下に描画
-    //     painter.setCompositionMode(QPainter::CompositionMode_DestinationOver);
-
-    //     // 透明度を明示的に設定
-    //     qreal opacity = static_cast<qreal>(m_backgroundOpacity) / 100.0;
-    //     qDebug() << "背景画像の透明度: " << opacity << " (元の値: " << m_backgroundOpacity << ")";
-
-    //     painter.setOpacity(opacity);
-    //     painter.setRenderHint(QPainter::SmoothPixmapTransform);
-
-    //     // ウィンドウ全体に画像を描画
-    //     painter.drawPixmap(rect(), m_backgroundImage, m_backgroundImage.rect());
-    // }
-}
-
-// 背景画像設定ダイアログを表示
-void MainWindow::showBackgroundDialog()
-{
-    // ダイアログ作成
-    QDialog dialog(this);
-    dialog.setWindowTitle(tr("背景画像の設定"));
-    dialog.setMinimumWidth(400);
-
-    QVBoxLayout *layout = new QVBoxLayout(&dialog);
-
-    // 背景画像の使用有無を選択するチェックボックス
-    QCheckBox *useBackground = new QCheckBox(tr("背景画像を使用する"));
-    useBackground->setChecked(m_useBackgroundImage);
-    layout->addWidget(useBackground);
-
-    // 画像パス表示用のラベルとボタン
-    QHBoxLayout *pathLayout = new QHBoxLayout();
-    QLabel *pathLabel = new QLabel(tr("画像パス:"));
-    QLineEdit *pathEdit = new QLineEdit(m_backgroundImagePath);
-    pathEdit->setReadOnly(true);
-    QPushButton *browseButton = new QPushButton(tr("参照..."));
-
-    pathLayout->addWidget(pathLabel);
-    pathLayout->addWidget(pathEdit);
-    pathLayout->addWidget(browseButton);
-    layout->addLayout(pathLayout);
-
-    // 透明度設定用のスライダー
-    QHBoxLayout *opacityLayout = new QHBoxLayout();
-    QLabel *opacityLabel = new QLabel(tr("透明度:"));
-    QSlider *opacitySlider = new QSlider(Qt::Horizontal);
-    opacitySlider->setRange(0, 100);
-    opacitySlider->setValue(m_backgroundOpacity);
-
-    opacityLayout->addWidget(opacityLabel);
-    opacityLayout->addWidget(opacitySlider);
-    layout->addLayout(opacityLayout);
-
-    // ボタン用レイアウト
-    QHBoxLayout *buttonLayout = new QHBoxLayout();
-    QPushButton *okButton = new QPushButton(tr("OK"));
-    QPushButton *cancelButton = new QPushButton(tr("キャンセル"));
-    QPushButton *clearButton = new QPushButton(tr("背景をクリア"));
-
-    buttonLayout->addWidget(clearButton);
-    buttonLayout->addStretch();
-    buttonLayout->addWidget(okButton);
-    buttonLayout->addWidget(cancelButton);
-    layout->addLayout(buttonLayout);
-
-    // シグナル/スロット接続
-    connect(browseButton, &QPushButton::clicked, [&]()
-            {
-        QString imagePath = QFileDialog::getOpenFileName(&dialog, 
-            tr("背景画像を選択"), 
-            QStandardPaths::writableLocation(QStandardPaths::PicturesLocation),
-            tr("画像ファイル (*.png *.jpg *.jpeg *.bmp *.gif)"));
-            
-        if (!imagePath.isEmpty()) {
-            pathEdit->setText(imagePath);
-        } });
-
-    connect(clearButton, &QPushButton::clicked, [&]()
-            { pathEdit->clear(); });
-
-    connect(okButton, &QPushButton::clicked, [&]()
-            {
-        bool useImage = useBackground->isChecked();
-        QString path = pathEdit->text();
-        
-        // 背景画像を使用する設定だが画像が選択されていない場合
-        if (useImage && path.isEmpty()) {
-            QMessageBox::warning(&dialog, tr("警告"), tr("背景画像を使用する場合は、画像を選択してください。"));
-            return;
-        }
-        
-        // 設定を適用
-        m_useBackgroundImage = useImage;
-        
-        if (useImage) {
-            setBackgroundImage(path);
-        } else {
-            // 背景なしに設定
-            m_backgroundImagePath = "";
-            m_backgroundImage = QPixmap();
-            repaint();
-        }
-        
-        // 透明度を適用
-        m_backgroundOpacity = opacitySlider->value();
-        
-        // 設定を保存
-        saveBackgroundSettings();
-        
-        dialog.accept(); });
-
-    connect(cancelButton, &QPushButton::clicked, &dialog, &QDialog::reject);
-
-    // ダイアログを表示
-    dialog.exec();
-}
-
-// 背景画像を設定
-void MainWindow::setBackgroundImage(const QString &imagePath)
-{
-    if (imagePath.isEmpty())
-    {
-        m_useBackgroundImage = false;
-        m_backgroundImage = QPixmap();
-        m_backgroundImagePath = "";
-    }
-    else
-    {
-        QPixmap image(imagePath);
-        if (!image.isNull())
-        {
-            m_backgroundImage = image;
-            m_backgroundImagePath = imagePath;
-            m_useBackgroundImage = true;
-        }
-        else
-        {
-            QMessageBox::warning(this, tr("エラー"), tr("画像の読み込みに失敗しました: %1").arg(imagePath));
-            m_useBackgroundImage = false;
-        }
-    }
-
-    // 画面を再描画
-    repaint();
-}
-
-// 背景画像をクリア
-void MainWindow::clearBackgroundImage()
-{
-    m_useBackgroundImage = false;
-    m_backgroundImage = QPixmap();
-    m_backgroundImagePath = "";
-    saveBackgroundSettings();
-    repaint();
-}
-
-// 透明度の値を確実に読み込むよう修正
-void MainWindow::loadBackgroundSettings()
-{
-    QString settingsPath = QDir::homePath() + "/shirafuka_settings.ini";
-    QSettings settings(settingsPath, QSettings::IniFormat);
-
-    m_useBackgroundImage = settings.value("Background/UseBackgroundImage", false).toBool();
-    QString imagePath = settings.value("Background/BackgroundImagePath", "").toString();
-
-    // 透明度の読み込みを確実に行う
-    bool ok;
-    int opacity = settings.value("Background/Opacity", 80).toInt(&ok);
-    if (ok)
-    {
-        m_backgroundOpacity = opacity;
-    }
-    else
-    {
-        m_backgroundOpacity = 80; // デフォルト値
-    }
-
-    qDebug() << "背景設定読み込み: 使用=" << m_useBackgroundImage
-             << ", パス=" << imagePath
-             << ", 透明度=" << m_backgroundOpacity;
-
-    // 既存のコード...
-}
-
-// 背景設定を保存する
-void MainWindow::saveBackgroundSettings()
-{
-    QSettings settings;
-    settings.beginGroup("Background");
-    settings.setValue("UseBackgroundImage", m_useBackgroundImage);
-    settings.setValue("BackgroundImagePath", m_backgroundImagePath);
-    settings.setValue("Opacity", m_backgroundOpacity);
-    settings.endGroup();
-}
-
-// テスト関数の設定保存部分も修正
-
-void MainWindow::testBackgroundImage()
-{
-    // ファイル選択ダイアログを表示
-    QString imagePath = QFileDialog::getOpenFileName(this,
-                                                     tr("テスト背景画像を選択"),
-                                                     QDir::homePath(),
-                                                     tr("画像ファイル (*.png *.jpg *.jpeg *.bmp)"));
-
-    if (imagePath.isEmpty())
-    {
-        return;
-    }
-
-    // 画像を直接設定
-    QPixmap testImage(imagePath);
-    if (!testImage.isNull())
-    {
-        m_backgroundImage = testImage;
-        m_useBackgroundImage = true;
-        m_backgroundOpacity = 80;
-
-        qDebug() << "テスト背景画像を設定: " << imagePath;
-        qDebug() << "画像サイズ: " << testImage.width() << "x" << testImage.height();
-
-        // 同じ設定ファイルを使用
-        QString settingsPath = QDir::homePath() + "/shirafuka_settings.ini";
-        QSettings settings(settingsPath, QSettings::IniFormat);
-
-        settings.setValue("Background/UseBackgroundImage", true);
-        settings.setValue("Background/BackgroundImagePath", imagePath);
-        settings.setValue("Opacity", m_backgroundOpacity);
-        settings.sync();
-
-        qDebug() << "テスト設定を保存: " << settings.fileName();
-
-        // 強制的に再描画
-        update();
-    }
-    else
-    {
-        QMessageBox::warning(this, tr("エラー"), tr("画像の読み込みに失敗しました: %1").arg(imagePath));
-    }
-}
-
-// デフォルト背景を設定する補助メソッド
-void MainWindow::setDefaultBackground()
-{
-    // リソースからデフォルト背景を読み込む例
-    // QPixmap defaultBg(":/images/default_background.jpg");
-
-    // またはシンプルなグラデーション背景を生成
-    QLinearGradient gradient(0, 0, width(), height());
-    gradient.setColorAt(0, QColor(240, 240, 255));
-    gradient.setColorAt(1, QColor(210, 225, 240));
-
-    QPixmap defaultBg(width(), height());
-    defaultBg.fill(Qt::transparent);
-
-    QPainter painter(&defaultBg);
-    painter.fillRect(0, 0, width(), height(), gradient);
-
-    m_backgroundImage = defaultBg;
-    m_useBackgroundImage = true;
-    m_backgroundOpacity = 60; // デフォルト背景は薄めに
-
-    update();
-}
-
-// カードのスタイルを半透明に設定するメソッド
-void MainWindow::setupTransparentStyle()
-{
-    // カード全体に適用するコンパクトなスタイル
-    QString cardStyle = R"(
-        /* コンパクトなカードスタイル */
-        BackupCard {
-            background-color: rgba(255, 255, 255, 250);
-            border: 1px solid rgba(150, 150, 150, 200);
-            border-radius: 6px;
-            margin: 4px;
-            padding: 6px 6px 12px 6px; /* 下部のパディングを増やす (6px→12px) */
-        }
-        
-        /* ボタンコンテナの下部マージン */
-        BackupCard QWidget#buttonContainer {
-            margin-bottom: 8px;
-        }
-        
-        /* ラベルをコンパクトに */
-        BackupCard QLabel {
-            color: #101010;
-            font-weight: normal;
-            background-color: transparent;
-        }
-        
-        /* タイトルラベル - 小さめに */
-        BackupCard QLabel#titleLabel {
-            font-weight: bold;
-            font-size: 11pt;
-            color: #000000;
-            margin-bottom: 4px;
-        }
-        
-        /* パスラベル - さらに小さく */
-        BackupCard QLabel#pathLabel {
-            color: #404040;
-            font-size: 8pt;
-        }
-        
-        /* コンパクトなボタンスタイル */
-        BackupCard QPushButton {
-            background-color: #f0f0f0;
-            color: #202020;
-            border: 1px solid #c0c0c0;
-            border-radius: 3px;
-            padding: 4px 8px;
-            font-weight: bold;
-            min-width: 60px;
-            min-height: 24px;
-            font-size: 9pt;
-            margin-bottom: 6px; /* ボタン下部にマージンを追加 */
-        }
-        
-        /* 実行ボタン - コンパクトだが目立つように */
-        BackupCard QPushButton#runButton {
-            background-color: #e8f4e8;
-            color: #006000;
-            border: 1px solid #80c080;
-            min-width: 70px;
-            font-size: 10pt;
-        }
-        
-        BackupCard QPushButton#runButton:hover {
-            background-color: #d0f0d0;
-        }
-        
-        /* その他のウィジェット - 変更なし */
-    )";
-
-    // バックアップカードの単純化とコンパクト化
-    for (BackupCard *card : backupCards)
-    {
-        // 基本設定
-        card->setAutoFillBackground(true);
-        card->setContentsMargins(6, 6, 6, 12); // 下部の余白を増やす (6→12)
-
-        // カードの高さを少し増やして余白を確保
-        card->setFixedHeight(130); // 120→130に増加
-
-        // 既存のボタンウィジェットを取得し、マージンを追加
-        QList<QPushButton *> buttons = card->findChildren<QPushButton *>();
-        for (QPushButton *btn : buttons)
-        {
-            // ボタン下部のマージンを設定
-            QMargins margins = btn->contentsMargins();
-            margins.setBottom(margins.bottom() + 6); // 下部に6pxのマージンを追加
-            btn->setContentsMargins(margins);
-        }
-
-        // ボタンを含む親ウィジェット（通常はQFrame）を探してIDを設定
-        QList<QFrame *> frames = card->findChildren<QFrame *>();
-        for (QFrame *frame : frames)
-        {
-            if (frame->findChildren<QPushButton *>().count() > 0)
-            {
-                frame->setObjectName("buttonContainer");
-                frame->setContentsMargins(frame->contentsMargins().left(),
-                                          frame->contentsMargins().top(),
-                                          frame->contentsMargins().right(),
-                                          frame->contentsMargins().bottom() + 8);
-            }
-        }
-
-        // その他の既存のスタイル設定（省略しています）
-        // ...existing code...
-    }
-
-    // 全体のスタイルシートを設定
-    setStyleSheet(cardStyle);
-}
-
 // MainWindow.cppでのaddBackupボタンの処理部分
 
 void MainWindow::addBackup()
@@ -1228,10 +760,4 @@ void MainWindow::addBackup()
     // 通常のshow()の代わりにexec()を使う場合は注意
     // exec()はモーダルダイアログを表示してユーザーの応答を待ちます
     dialog->exec(); // または dialog->show();
-}
-
-void MainWindow::showDisabledBackgroundDialog()
-{
-    QMessageBox::information(this, tr("背景画像機能は無効化されています"),
-                             tr("背景画像機能は現在無効化されています。\nパフォーマンスと安定性の向上のため、この機能は利用できません。"));
 }
