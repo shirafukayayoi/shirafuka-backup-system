@@ -421,37 +421,28 @@ void MainWindow::showBackupDialog()
 {
     try
     {
-        // ダイアログを生成（ヒープ上に作成）
-        BackupDialog *dialog = new BackupDialog(this);
-        dialog->setWindowTitle(tr("バックアップの追加"));
+        // 最もシンプルな方法でモーダルダイアログを作成
+        BackupDialog dialog(this);
+        dialog.setAttribute(Qt::WA_QuitOnClose, false); // ここで明示的に設定
+        dialog.setWindowTitle(tr("バックアップの追加"));
 
-        // 明示的にQuit on Closeを無効化
-        dialog->setAttribute(Qt::WA_QuitOnClose, false);
+        // モーダル表示
+        if (dialog.exec() == QDialog::Accepted)
+        {
+            BackupConfig config = dialog.getBackupConfig();
 
-        // ウィンドウの関係をはっきり設定
-        dialog->setWindowModality(Qt::ApplicationModal);
-
-        // メモリリークを防止するために、ダイアログが閉じられたら自動削除
-        connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
-
-        // exec()の代わりにshowで表示して信号接続
-        connect(dialog, &QDialog::accepted, [this, dialog]()
-                {
-            BackupConfig config = dialog->getBackupConfig();
-            
             // 設定マネージャーに追加
             configManager->addBackupConfig(config);
-            
+
             // 設定を保存
             saveBackupConfigs();
-            
+
             // カードとリストを更新
             loadBackupConfigs();
-            
-            // ログに記録
-            addLogEntry(QString("新しいバックアップ '%1' を追加しました").arg(config.name())); });
 
-        dialog->open(); // モードレスダイアログとして開く
+            // ログに記録
+            addLogEntry(QString("新しいバックアップ '%1' を追加しました").arg(config.name()));
+        }
     }
     catch (const std::exception &e)
     {
@@ -901,43 +892,33 @@ void MainWindow::editBackup(int index)
         return;
     }
 
-    // 編集するバックアップ設定を取得
-    BackupConfig config = configManager->backupConfigs()[index];
-
     try
     {
-        // ヒープにダイアログを作成
-        BackupDialog *dialog = new BackupDialog(config, this);
-        dialog->setWindowTitle(tr("バックアップの編集"));
+        // 編集するバックアップ設定を取得
+        BackupConfig config = configManager->backupConfigs()[index];
 
-        // 明示的にQuit on Closeを無効化
-        dialog->setAttribute(Qt::WA_QuitOnClose, false);
+        // 最も単純なアプローチでモーダルダイアログを作成
+        BackupDialog dialog(config, this);
+        dialog.setAttribute(Qt::WA_QuitOnClose, false); // ここで明示的に設定
 
-        // ウィンドウモーダリティを設定
-        dialog->setWindowModality(Qt::ApplicationModal);
-
-        // メモリリークを防止するために、ダイアログが閉じられたら自動削除
-        connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
-
-        // 受け入れられた場合の処理
-        connect(dialog, &QDialog::accepted, [this, dialog, index]()
-                {
+        // モーダルとして実行
+        if (dialog.exec() == QDialog::Accepted)
+        {
             // 更新された設定を取得
-            BackupConfig updatedConfig = dialog->getBackupConfig();
-            
+            BackupConfig updatedConfig = dialog.getBackupConfig();
+
             // 設定を更新
             configManager->updateBackupConfig(index, updatedConfig);
-            
+
             // 設定を保存
             saveBackupConfigs();
-            
+
             // UI表示を更新
             loadBackupConfigs();
-            
-            // ログに記録
-            addLogEntry(QString("バックアップ設定 '%1' を更新しました").arg(updatedConfig.name())); });
 
-        dialog->open(); // モードレスダイアログとして開く
+            // ログに記録
+            addLogEntry(QString("バックアップ設定 '%1' を更新しました").arg(updatedConfig.name()));
+        }
     }
     catch (const std::exception &e)
     {

@@ -68,6 +68,8 @@ public slots:
 signals:
     void backupRequested(const QString &source, const QString &destination);
     void backupCancelled();
+    // クラス定義にdestroyedシグナルを追加
+    void destroyed();
 
 private:
     void setupUI();
