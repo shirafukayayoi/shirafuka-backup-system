@@ -33,16 +33,8 @@ public:
 
     BackupConfig getBackupConfig() const;
 
-public slots:
-    void updateProgress(int value);
-    void backupFinished();
-    void accept() override;
-    void reject() override;
-    void done(int result) override; // 追加: done()をオーバーライド
-
-signals:
-    void backupRequested(const QString &source, const QString &destination);
-    void backupCancelled();
+protected:
+    void closeEvent(QCloseEvent *event) override; // 明示的にoverrideとして宣言
 
 private slots:
     void startBackup();
@@ -52,8 +44,16 @@ private slots:
     void browseSourcePath();
     void browseDestinationPath();
 
-protected:
-    void closeEvent(QCloseEvent *event) override; // QEvent -> QCloseEvent に変更
+public slots:
+    void updateProgress(int value);
+    void backupFinished();
+    void accept() override;
+    void reject() override;
+    void done(int result) override; // 明示的にoverrideとして宣言
+
+signals:
+    void backupRequested(const QString &source, const QString &destination);
+    void backupCancelled();
 
 private:
     void setupUI();

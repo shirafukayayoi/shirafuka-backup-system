@@ -385,42 +385,44 @@ void MainWindow::clearBackupCards()
 
 void MainWindow::showBackupDialog()
 {
-    // 重要: QPointer を使用してダイアログの有効性を追跡
-    QPointer<BackupDialog> dialog = new BackupDialog(this);
+    // 新しいダイアログを作成（親を明示的に指定）
+    BackupDialog *dialog = new BackupDialog(this);
 
-    // 既存の設定（必要に応じて）
-    // dialog->setSourcePath(...);
-    // dialog->setDestinationPath(...);
+    // 親子関係を明示的に設定
+    dialog->setParent(this, dialog->windowFlags());
 
-    // 重要: ダイアログをモードレス（非モーダル）で表示し、閉じた後に自動削除されるように設定
-    dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowModality(Qt::NonModal);
+    // DeleteOnClose属性を設定せず、代わりにconnectedオブジェクトが削除されるときに
+    // 自動的に切断されるQtの機能を利用
 
-    // 閉じるイベントをカスタム処理するためのフック
-    QObject::connect(dialog, &QDialog::finished, [dialog]()
-                     {
-                         qDebug() << "ダイアログが閉じられました";
-                         // 必要に応じて追加処理
-                     });
+    // ダイアログの閉じる処理（Finished）を監視
+    connect(dialog, &QDialog::finished, [dialog](int)
+            {
+        qDebug() << "ダイアログが閉じられ、finished シグナルを発行しました";
+        // 明示的に後で削除するようスケジュール
+        dialog->deleteLater(); });
 
-    // バックアップ要求シグナルの処理（これは既存のコードを参考にしてください）
-    QObject::connect(dialog, &BackupDialog::backupRequested,
-                     this, [this, dialog](const QString &source, const QString &dest)
-                     {
-                         qDebug() << "バックアップ要求: " << source << " -> " << dest;
-                         // 既存のバックアップ処理をここに記述
-                     });
+    // バックアップ要求シグナルを処理
+    connect(dialog, &BackupDialog::backupRequested,
+            this, [this, dialog](const QString &source, const QString &dest)
+            {
+                qDebug() << "バックアップ要求: " << source << " -> " << dest;
+                // バックアップ処理をここに記述...
+            });
 
-    // バックアップキャンセル処理
-    QObject::connect(dialog, &BackupDialog::backupCancelled,
-                     this, [this, dialog]()
-                     {
-                         qDebug() << "バックアップがキャンセルされました";
-                         // 既存のキャンセル処理をここに記述
-                     });
+    // バックアップキャンセルシグナルを処理
+    connect(dialog, &BackupDialog::backupCancelled,
+            this, [this, dialog]()
+            {
+                qDebug() << "バックアップがキャンセルされました";
+                // キャンセル処理をここに記述...
+            });
 
-    // 非モーダルで表示（これが重要）
+    // ダイアログを表示
     dialog->show();
+
+    // ダイアログをアクティブウィンドウにする
+    dialog->activateWindow();
+    dialog->raise();
 }
 
 void MainWindow::runBackup(const BackupConfig &config)

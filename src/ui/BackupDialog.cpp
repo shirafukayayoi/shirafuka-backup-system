@@ -17,7 +17,6 @@ BackupDialog::BackupDialog(QWidget *parent)
     setupUI();
     setWindowTitle(tr("バックアップの追加"));
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
-    setAttribute(Qt::WA_DeleteOnClose, false);
 }
 
 BackupDialog::BackupDialog(const BackupConfig &config, QWidget *parent)
@@ -27,7 +26,6 @@ BackupDialog::BackupDialog(const BackupConfig &config, QWidget *parent)
     loadFromConfig(config);
     setWindowTitle(tr("バックアップの編集"));
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
-    setAttribute(Qt::WA_DeleteOnClose, false);
 }
 
 void BackupDialog::setupUI()
@@ -347,7 +345,7 @@ void BackupDialog::reject()
     qDebug() << "BackupDialog::reject() finished"; // デバッグログを追加
 }
 
-// closeEvent - 単純化
+// closeEventを修正
 void BackupDialog::closeEvent(QCloseEvent *event)
 {
     qDebug() << "BackupDialog::closeEvent() called"; // デバッグログを追加
@@ -377,7 +375,7 @@ void BackupDialog::closeEvent(QCloseEvent *event)
                 cancelButton->setEnabled(false);
             }
 
-            // イベントを受け入れてダイアログのみを閉じる
+            // イベントを受け入れる（ダイアログを閉じる）
             event->accept();
         }
         else
@@ -388,12 +386,25 @@ void BackupDialog::closeEvent(QCloseEvent *event)
     }
     else
     {
-        // バックアップ実行中でなければ、通常通りダイアログを閉じる
+        // バックアップ実行中でなければイベントを受け入れる（ダイアログを閉じる）
         event->accept();
     }
 
     qDebug() << "BackupDialog::closeEvent() finished with accept:"
              << (event->isAccepted() ? "true" : "false"); // デバッグログを追加
+}
+
+// done()メソッドを安全に実装
+void BackupDialog::done(int result)
+{
+    qDebug() << "BackupDialog::done() called with result:" << result;
+
+    // 処理が必要なら行う（ここでは特に何もしない）
+
+    // 基底クラスの処理を呼び出す
+    QDialog::done(result);
+
+    qDebug() << "BackupDialog::done() finished";
 }
 
 // デストラクタの実装を追加
@@ -431,15 +442,4 @@ void BackupDialog::setDestinationPath(const QString &path)
     {
         destPathEdit->setText(path);
     }
-}
-
-// done()メソッドをオーバーライドしてアプリ終了を防止
-void BackupDialog::done(int result)
-{
-    qDebug() << "BackupDialog::done() called with result:" << result;
-
-    // 明示的に親クラスの実装を呼び出し、予期せぬ動作を防止
-    QDialog::done(result);
-
-    qDebug() << "BackupDialog::done() finished";
 }
