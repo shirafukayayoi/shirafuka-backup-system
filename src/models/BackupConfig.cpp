@@ -83,6 +83,16 @@ void BackupConfig::setExcludedExtensions(const QStringList &extensions)
     m_excludedExtensions = extensions;
 }
 
+QJsonObject BackupConfig::extraData() const
+{
+    return m_extraData;
+}
+
+void BackupConfig::setExtraData(const QJsonObject &data)
+{
+    m_extraData = data;
+}
+
 QJsonObject BackupConfig::toJson() const
 {
     QJsonObject json;
@@ -120,6 +130,9 @@ QJsonObject BackupConfig::toJson() const
         }
         json["excludedExtensions"] = extensionsArray;
     }
+
+    // 追加データを保存
+    json["extraData"] = m_extraData;
 
     return json;
 }
@@ -167,6 +180,12 @@ BackupConfig BackupConfig::fromJson(const QJsonObject &json)
             extensions.append(value.toString());
         }
         config.setExcludedExtensions(extensions);
+    }
+
+    // 追加データを読み込み
+    if (json.contains("extraData"))
+    {
+        config.m_extraData = json["extraData"].toObject();
     }
 
     return config;
