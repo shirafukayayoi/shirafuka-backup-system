@@ -105,6 +105,22 @@ void ConfigManager::removeBackupConfig(int index)
     }
 }
 
+int ConfigManager::findConfigIndex(const BackupConfig &config) const
+{
+    for (int i = 0; i < m_backupConfigs.size(); ++i)
+    {
+        // IDでの比較は現在BackupConfigに実装されていないようなのでスキップ
+        // そのかわり名前とパスで比較する
+        if (m_backupConfigs[i].name() == config.name() &&
+            m_backupConfigs[i].sourcePath() == config.sourcePath() &&
+            m_backupConfigs[i].destinationPath() == config.destinationPath())
+        {
+            return i;
+        }
+    }
+    return -1; // 見つからない場合
+}
+
 QString ConfigManager::defaultBackupDestination() const
 {
     return m_defaultBackupDestination;

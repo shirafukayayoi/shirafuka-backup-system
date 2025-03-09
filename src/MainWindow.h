@@ -96,6 +96,7 @@ private:
     QPushButton *settingsButton;
     QPushButton *logButton;
     QToolButton *viewModeButton;
+    QPushButton *batchBackupButton;
 
     // バックアップ管理
     QList<BackupCard *> backupCards;

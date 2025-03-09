@@ -210,8 +210,13 @@ void MainWindow::setupUI()
     // バックアップ追加ボタン
     addBackupButton = new QPushButton("バックアップを追加", this);
 
-    // 一括バックアップボタン
-    runAllBackupsButton = new QPushButton("すべてバックアップ", this);
+    // 一括バックアップボタン - 1つだけに統合
+    // 以下のどちらか1つだけ使用
+    batchBackupButton = new QPushButton("全てをバックアップ", this);
+    batchBackupButton->setIcon(QIcon(":/icons/backup-all.png"));
+
+    // runAllBackupsButtonは削除または使用しない
+    // runAllBackupsButton = new QPushButton("すべてバックアップ", this);
 
     // 表示切替ボタン
     viewModeButton = new QToolButton(this);
@@ -232,11 +237,17 @@ void MainWindow::setupUI()
     logButton = new QPushButton("ログ", this);
 
     buttonLayout->addWidget(addBackupButton);
-    buttonLayout->addWidget(runAllBackupsButton);
+    buttonLayout->addWidget(batchBackupButton); // これだけ追加
+    // buttonLayout->addWidget(runAllBackupsButton); // この行は削除
     buttonLayout->addStretch();
     buttonLayout->addWidget(viewModeButton);
     buttonLayout->addWidget(settingsButton);
     buttonLayout->addWidget(logButton); // 新規追加
+
+    // コネクト - runAllBackups に接続（ヘッダーですでに宣言されているため）
+    connect(batchBackupButton, &QPushButton::clicked, this, &MainWindow::runAllBackups);
+    // connect(runAllBackupsButton, &QPushButton::clicked, this, &MainWindow::runAllBackups);
+
     mainLayout->addLayout(buttonLayout);
 
     // ステータスバーの設定
@@ -249,7 +260,6 @@ void MainWindow::setupUI()
 
     // シグナル/スロット接続
     connect(addBackupButton, &QPushButton::clicked, this, &MainWindow::showBackupDialog);
-    connect(runAllBackupsButton, &QPushButton::clicked, this, &MainWindow::runAllBackups);
     connect(settingsButton, &QPushButton::clicked, this, &MainWindow::showSettingsDialog);
     connect(logButton, &QPushButton::clicked, this, &MainWindow::showLogDialog); // 新規追加
     connect(cardViewAction, &QAction::triggered, this, &MainWindow::switchToCardView);
@@ -264,10 +274,40 @@ void MainWindow::showSettingsDialog()
 {
     SettingsDialog dialog(this);
 
+    // 現在のバックアップスケジュール設定をダイアログに渡す
+    dialog.setScheduleEnabled(backupScheduler->isScheduleEnabled());
+    dialog.setScheduledTime(backupScheduler->scheduledTime());
+    dialog.setPeriodicBackupEnabled(backupScheduler->isPeriodicBackupEnabled());
+    dialog.setPeriodicInterval(backupScheduler->periodicInterval());
+
+    // 次回予定されているバックアップ時間を表示
+    dialog.setNextBackupTime(backupScheduler->nextBackupTime());
+
     if (dialog.exec() == QDialog::Accepted)
     {
-        // 設定ダイアログが受け入れられたら背景設定を再読み込み
+        // 背景設定を再読み込み
         loadBackgroundSettings();
+
+        // スケジューラ設定を更新
+        backupScheduler->setScheduleEnabled(dialog.isScheduleEnabled());
+        backupScheduler->setScheduledTime(dialog.scheduledTime());
+        backupScheduler->setPeriodicBackupEnabled(dialog.isPeriodicBackupEnabled());
+        backupScheduler->setPeriodicInterval(dialog.periodicInterval());
+
+        // 設定を保存
+        saveSchedulerSettings();
+
+        // 次回バックアップ時間更新をログに記録
+        QDateTime nextBackup = backupScheduler->nextBackupTime();
+        if (nextBackup.isValid())
+        {
+            addLogEntry(QString("次回のバックアップが %1 に予定されています")
+                            .arg(nextBackup.toString("yyyy/MM/dd HH:mm")));
+        }
+        else
+        {
+            addLogEntry("自動バックアップは無効になっています");
+        }
     }
 }
 
@@ -521,6 +561,8 @@ void MainWindow::backupComplete()
     // バッチバックアップ実行中の場合
     if (isRunningBatchBackup)
     {
+        qDebug() << "バックアップ完了 - 次のバックアップを開始します";
+
         // 次のバックアップを処理
         processNextBackup();
     }
@@ -539,20 +581,26 @@ void MainWindow::backupComplete()
 
 void MainWindow::runAllBackups()
 {
+    qDebug() << "runAllBackups called"; // デバッグ出力を追加
+
     // 既に実行中の場合は何もしない
     if (isRunningBatchBackup)
     {
         statusBar()->showMessage(tr("バックアップが既に実行中です"));
+        qDebug() << "バックアップが既に実行中です";
         return;
     }
 
     // バックアップ設定のリストを取得
-    QList<BackupConfig> configs = configManager->backupConfigs();
+    QVector<BackupConfig> configs = configManager->backupConfigs();
     if (configs.isEmpty())
     {
         QMessageBox::information(this, tr("バックアップ"), tr("バックアップ設定がありません。"));
+        qDebug() << "バックアップ設定がありません";
         return;
     }
+
+    qDebug() << "バックアップ設定数: " << configs.size(); // デバッグ出力を追加
 
     // キューをクリアして設定を追加
     backupQueue.clear();
@@ -566,42 +614,53 @@ void MainWindow::runAllBackups()
     currentBackupIndex = 0;
     isRunningBatchBackup = true;
 
-    // 自動バックアップの場合はログに記録
-    if (isAutomaticBackup)
-    {
-        addLogEntry(QString("%1個のバックアップを自動実行します").arg(totalBackupsInQueue));
-    }
-    else
-    {
-        addLogEntry(QString("%1個のバックアップを実行します").arg(totalBackupsInQueue));
-    }
+    // ステータスバー表示の更新
+    statusBar()->showMessage(tr("一括バックアップを開始します..."));
 
-    // バックアップを開始
+    // 最初のバックアップを開始
     processNextBackup();
 }
 
+// processNextBackupメソッド内のカード進捗表示部分を修正
 void MainWindow::processNextBackup()
 {
+    qDebug() << "processNextBackup called, queue size: " << backupQueue.size();
+
     if (backupQueue.isEmpty())
     {
+        // すべてのバックアップが完了
         isRunningBatchBackup = false;
+        statusBar()->showMessage(tr("すべてのバックアップが完了しました"), 5000);
 
         // 自動バックアップフラグをリセット
-        bool wasAutomatic = isAutomaticBackup;
         isAutomaticBackup = false;
 
-        statusBar()->showMessage(tr("すべてのバックアップが完了しました"));
-
-        // 自動バックアップの場合は通知だけ表示して、ダイアログは表示しない
-        if (!wasAutomatic)
-        {
-            QMessageBox::information(this, "完了", "すべてのバックアップが完了しました");
-        }
-
+        QMessageBox::information(this, tr("バックアップ完了"), tr("すべてのバックアップが完了しました。"));
+        qDebug() << "すべてのバックアップが完了しました";
         return;
     }
 
-    // 残りはそのまま...
+    // キューから次のバックアップ設定を取得
+    BackupConfig config = backupQueue.dequeue();
+    currentBackupIndex++;
+
+    qDebug() << "バックアップ実行: " << config.name() << " (" << currentBackupIndex
+             << "/" << totalBackupsInQueue << ")";
+
+    // *** バックアップエンジンを直接使用 ***
+    // カードのボタン経由ではなく、直接backupEngineを使用
+    backupEngine->startBackup(config.sourcePath(), config.destinationPath());
+
+    // 注意: バックアップの完了は backupComplete() で処理される
+    // そこから次のprocessNextBackup()を呼び出す
+
+    // カードの進捗表示を更新（オプション）
+    int cardIndex = configManager->findConfigIndex(config);
+    if (cardIndex >= 0 && cardIndex < backupCards.size())
+    {
+        // startProgress()ではなくsetProgress()を使用
+        backupCards[cardIndex]->setProgress(0); // 進捗を0%から開始
+    }
 }
 
 void MainWindow::showLogDialog()

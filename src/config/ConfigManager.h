@@ -30,6 +30,8 @@ public:
     QJsonObject getConfig() const;             // 設定全体を取得
     void setConfig(const QJsonObject &config); // 設定全体を設定
 
+    int findConfigIndex(const BackupConfig &config) const;
+
 private:
     QString m_configFilePath;
     QJsonObject m_config;
