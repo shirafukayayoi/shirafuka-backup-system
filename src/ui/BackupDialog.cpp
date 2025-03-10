@@ -16,33 +16,17 @@ BackupDialog::BackupDialog(QWidget *parent)
     : QDialog(parent),
       m_backupMode(StandardBackup)
 {
-    // アプリ終了防止の属性を必ず設定
-    setAttribute(Qt::WA_QuitOnClose, false);
-
-    // これによりダイアログが閉じた時にアプリケーションが終了しないようになる
-    setAttribute(Qt::WA_DeleteOnClose, false);
-
-    // スタイル設定
-    setWindowFlags(Qt::Dialog);
+    // セーブデータフォルダの初期値を設定
+    m_saveDataFolderNames = QStringList() << "savedata" << "UserData" << "save" << "Save";
 
     setupUI();
     setWindowTitle(tr("バックアップの追加"));
-    m_saveDataFolderNames = QStringList() << "savedata" << "UserData" << "save" << "Save";
 }
 
 BackupDialog::BackupDialog(const BackupConfig &config, QWidget *parent)
     : QDialog(parent),
-      m_backupMode(StandardBackup) // m_backupModeを初期化するように修正
+      m_backupMode(StandardBackup)
 {
-    // アプリ終了防止の属性を必ず設定
-    setAttribute(Qt::WA_QuitOnClose, false);
-
-    // これによりダイアログが閉じた時にアプリケーションが終了しないようになる
-    setAttribute(Qt::WA_DeleteOnClose, false);
-
-    // スタイル設定
-    setWindowFlags(Qt::Dialog);
-
     setupUI();
     loadFromConfig(config);
     setWindowTitle(tr("バックアップの編集"));
@@ -150,6 +134,8 @@ void BackupDialog::setupUI()
     QLabel *saveDataLabel = new QLabel(tr("検索するフォルダ名を改行で区切って入力してください:"), saveDataGroup);
     saveDataFoldersEdit = new QPlainTextEdit(saveDataGroup);
     saveDataFoldersEdit->setPlaceholderText(tr("例:\nsavedata\nUserData\nsave\nSave"));
+
+    // 初期値として設定したセーブフォルダ名をテキストエリアに設定
     saveDataFoldersEdit->setPlainText(m_saveDataFolderNames.join("\n"));
 
     saveDataLayout->addWidget(saveDataLabel);
@@ -466,21 +452,21 @@ void BackupDialog::accept()
 // reject()メソッドを修正
 void BackupDialog::reject()
 {
-    qDebug() << "BackupDialog::reject called";
+    // 標準的な実装のみにする
     QDialog::reject();
 }
 
-// closeEventを修正 - イベント伝播を確実に止める
+// closeEventをオーバーライド - より明示的にする
 void BackupDialog::closeEvent(QCloseEvent *event)
 {
-    qDebug() << "BackupDialog::closeEvent called";
-    event->accept(); // イベントを受け入れる
+    // 標準的な動作のみ - accept()の呼び出しのみでよい
+    event->accept();
 }
 
 // done()メソッドを修正
 void BackupDialog::done(int result)
 {
-    qDebug() << "BackupDialog::done called with result:" << result;
+    // 標準的な実装のみにする
     QDialog::done(result);
 }
 

@@ -35,6 +35,9 @@ MainWindow::MainWindow(QWidget *parent)
       currentViewMode(CardView),
       isAutomaticBackup(false) // 追加
 {
+    // アイコンを設定 - パスを修正
+    setWindowIcon(QIcon(":/src/icons/app_icon.png"));
+
     // 設定ファイルのパスを定義
     QString configPath = QDir::homePath() + "/.shirafuka_backup/config.json";
 
@@ -140,10 +143,9 @@ void MainWindow::setupUI()
     // バックアップ追加ボタン
     addBackupButton = new QPushButton("バックアップを追加", this);
 
-    // 一括バックアップボタン - 1つだけに統合
-    // 以下のどちらか1つだけ使用
+    // 一括バックアップボタン - パスを修正
     batchBackupButton = new QPushButton("全てをバックアップ", this);
-    batchBackupButton->setIcon(QIcon(":/icons/backup-all.png"));
+    batchBackupButton->setIcon(QIcon(":/src/icons/backup-all.png"));
 
     // runAllBackupsButtonは削除または使用しない
     // runAllBackupsButton = new QPushButton("すべてバックアップ", this);
@@ -421,26 +423,18 @@ void MainWindow::showBackupDialog()
 {
     try
     {
-        // 最もシンプルな方法でモーダルダイアログを作成
+        // スタック上にダイアログを作成し、スコープ終了時に自動的に破棄されるようにする
         BackupDialog dialog(this);
-        dialog.setAttribute(Qt::WA_QuitOnClose, false); // ここで明示的に設定
-        dialog.setWindowTitle(tr("バックアップの追加"));
 
-        // モーダル表示
+        // 標準的なモーダルダイアログとして実行
         if (dialog.exec() == QDialog::Accepted)
         {
             BackupConfig config = dialog.getBackupConfig();
 
-            // 設定マネージャーに追加
+            // 処理続行...
             configManager->addBackupConfig(config);
-
-            // 設定を保存
             saveBackupConfigs();
-
-            // カードとリストを更新
             loadBackupConfigs();
-
-            // ログに記録
             addLogEntry(QString("新しいバックアップ '%1' を追加しました").arg(config.name()));
         }
     }
@@ -897,26 +891,17 @@ void MainWindow::editBackup(int index)
         // 編集するバックアップ設定を取得
         BackupConfig config = configManager->backupConfigs()[index];
 
-        // 最も単純なアプローチでモーダルダイアログを作成
+        // スタック上にダイアログを作成
         BackupDialog dialog(config, this);
-        dialog.setAttribute(Qt::WA_QuitOnClose, false); // ここで明示的に設定
 
-        // モーダルとして実行
+        // 標準的なモーダルダイアログとして実行
         if (dialog.exec() == QDialog::Accepted)
         {
             // 更新された設定を取得
             BackupConfig updatedConfig = dialog.getBackupConfig();
-
-            // 設定を更新
             configManager->updateBackupConfig(index, updatedConfig);
-
-            // 設定を保存
             saveBackupConfigs();
-
-            // UI表示を更新
             loadBackupConfigs();
-
-            // ログに記録
             addLogEntry(QString("バックアップ設定 '%1' を更新しました").arg(updatedConfig.name()));
         }
     }
